@@ -1,0 +1,17 @@
+{
+  "name": "code-relay",
+  "version": "1.0.0",
+  "description": "Universal auto-sync extension for LeetCode, GFG, Codeforces, and CodeChef to GitHub",
+  "type": "module",
+  "scripts": {
+    "dev": "vite build --watch --mode development",
+    "build": "tsc && vite build",
+    "type-check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.308",
+    "@types/node": "^22.13.10",
+    "typescript": "^5.7.3",
+    "vite": "^6.2.0"
+  }
+}
