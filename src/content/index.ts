@@ -1,7 +1,6 @@
 import { LeetCodeAdapter } from '../adapters/leetcode';
 import { LeetCodeUI } from '../adapters/leetcode-ui';
 import { BaseAdapter } from '../adapters/base-adapter';
-import { GitHubService } from '../core/github';
 
 const adapters: BaseAdapter[] = [
   new LeetCodeAdapter()
@@ -10,7 +9,7 @@ const adapters: BaseAdapter[] = [
 let lastSubmissionId: string | number | null = null;
 
 /**
- * Handles submission processing and performs direct GitHub sync.
+ * Handles submission processing and sends payload to background service worker.
  */
 async function handleSubmission(adapter: BaseAdapter, submissionId: string | number) {
   console.log('[CodeRelay Content] Handling submission ID:', submissionId);
@@ -32,16 +31,22 @@ async function handleSubmission(adapter: BaseAdapter, submissionId: string | num
     }
 
     if (result.payload) {
-      console.log('[CodeRelay Content] Committing to GitHub directly from content script...');
-      const syncResult = await GitHubService.syncSubmission(result.payload);
-      console.log('[CodeRelay Content] Direct sync result:', syncResult);
-
-      if (syncResult.success) {
-        LeetCodeUI.setState('success', 'Pushed');
-      } else {
-        console.error('[CodeRelay Content] GitHub Sync Error:', syncResult.error);
-        LeetCodeUI.setState('error', syncResult.error || 'Push Failed');
-      }
+      console.log('[CodeRelay Content] Sending submission to background for GitHub sync...');
+      chrome.runtime.sendMessage(
+        {
+          type: 'SYNC_SUBMISSION',
+          payload: result.payload
+        },
+        (response) => {
+          console.log('[CodeRelay Content] Background commit response:', response);
+          if (response?.success) {
+            LeetCodeUI.setState('success', 'Pushed');
+          } else {
+            console.error('[CodeRelay Content] GitHub Sync Error:', response?.error);
+            LeetCodeUI.setState('error', response?.error || 'Push Failed');
+          }
+        }
+      );
     }
   } catch (err: any) {
     console.error('[CodeRelay Content] Exception while processing submission:', err);
