@@ -1,4 +1,4 @@
-import { BaseAdapter } from './base-adapter';
+import { BaseAdapter, SubmissionResult } from './base-adapter';
 import { ProblemDifficulty, SubmissionPayload } from '../core/types';
 
 const LANGUAGE_EXTENSIONS: Record<string, string> = {
@@ -26,6 +26,16 @@ const LANGUAGE_EXTENSIONS: Record<string, string> = {
   postgresql: 'sql',
   bash: 'sh',
   dart: 'dart'
+};
+
+const STATUS_MAP: Record<number, string> = {
+  10: 'Accepted',
+  11: 'Wrong Answer',
+  12: 'Memory Limit',
+  13: 'Output Limit',
+  14: 'Time Limit',
+  15: 'Runtime Error',
+  16: 'Compile Error'
 };
 
 export class LeetCodeAdapter implements BaseAdapter {
@@ -103,7 +113,7 @@ ${markdownContent}
   /**
    * Queries LeetCode GraphQL API to obtain submission details and formats the payload.
    */
-  async processSubmission(submissionId: string | number): Promise<SubmissionPayload | null> {
+  async processSubmission(submissionId: string | number): Promise<SubmissionResult | null> {
     const isCN = window.location.hostname.includes('leetcode.cn');
     const endpoint = isCN ? 'https://leetcode.cn/graphql/' : 'https://leetcode.com/graphql/';
 
@@ -158,9 +168,14 @@ ${markdownContent}
       return null;
     }
 
-    // Only process accepted submissions (statusCode 10 is Accepted)
-    if (details.statusCode !== 10) {
-      return null;
+    const isAccepted = details.statusCode === 10;
+    const statusText = STATUS_MAP[details.statusCode] || (isAccepted ? 'Accepted' : 'Failed');
+
+    if (!isAccepted) {
+      return {
+        accepted: false,
+        statusDisplay: statusText
+      };
     }
 
     const langKey = (details.lang?.name || '').toLowerCase();
@@ -179,7 +194,7 @@ ${markdownContent}
       details.question.content || ''
     );
 
-    return {
+    const payload: SubmissionPayload = {
       platform: 'leetcode',
       problemId: details.question.questionFrontendId || details.question.questionId,
       problemSlug: details.question.titleSlug,
@@ -193,6 +208,12 @@ ${markdownContent}
       tags,
       descriptionMarkdown,
       timestamp: details.timestamp ? details.timestamp * 1000 : Date.now()
+    };
+
+    return {
+      accepted: true,
+      statusDisplay: 'Accepted',
+      payload
     };
   }
 }

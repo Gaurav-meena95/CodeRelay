@@ -1,5 +1,11 @@
 import { SubmissionPayload, SupportedPlatform } from '../core/types';
 
+export interface SubmissionResult {
+  accepted: boolean;
+  statusDisplay?: string;
+  payload?: SubmissionPayload | null;
+}
+
 export interface BaseAdapter {
   platform: SupportedPlatform;
 
@@ -11,5 +17,5 @@ export interface BaseAdapter {
   /**
    * Extracts and normalizes submission data into standard SubmissionPayload.
    */
-  processSubmission(submissionId: string | number): Promise<SubmissionPayload | null>;
+  processSubmission(submissionId: string | number): Promise<SubmissionResult | null>;
 }
