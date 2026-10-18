@@ -21,8 +21,9 @@
       try {
         const cloned = response.clone();
         const data = await cloned.json();
-        if (data?.submission_id) {
-          dispatchSubmission(data.submission_id);
+        const subId = data?.submission_id || data?.submissionId;
+        if (subId) {
+          dispatchSubmission(subId);
         }
       } catch (err) {
         console.error('[CodeRelay Interceptor] Failed to parse submit response:', err);
@@ -63,8 +64,9 @@
       if (url.includes('/problems/') && url.includes('/submit/')) {
         try {
           const data = JSON.parse(this.responseText);
-          if (data?.submission_id) {
-            dispatchSubmission(data.submission_id);
+          const subId = data?.submission_id || data?.submissionId;
+          if (subId) {
+            dispatchSubmission(subId);
           }
         } catch {
           // Ignore invalid JSON

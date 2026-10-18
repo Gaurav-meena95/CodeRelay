@@ -1,6 +1,7 @@
 import { LeetCodeAdapter } from '../adapters/leetcode';
 import { LeetCodeUI } from '../adapters/leetcode-ui';
 import { BaseAdapter } from '../adapters/base-adapter';
+import { GitHubService } from '../core/github';
 
 const adapters: BaseAdapter[] = [
   new LeetCodeAdapter()
@@ -9,7 +10,7 @@ const adapters: BaseAdapter[] = [
 let lastSubmissionId: string | number | null = null;
 
 /**
- * Handles submission processing and updates the Push button visual indicator.
+ * Handles submission processing and performs direct GitHub sync.
  */
 async function handleSubmission(adapter: BaseAdapter, submissionId: string | number) {
   console.log('[CodeRelay Content] Handling submission ID:', submissionId);
@@ -19,8 +20,8 @@ async function handleSubmission(adapter: BaseAdapter, submissionId: string | num
     const result = await adapter.processSubmission(submissionId);
 
     if (!result) {
-      console.warn('[CodeRelay Content] No result returned from adapter');
-      LeetCodeUI.setState('error', 'Failed');
+      console.warn('[CodeRelay Content] Could not retrieve submission result');
+      LeetCodeUI.setState('error', 'Details failed');
       return;
     }
 
@@ -31,22 +32,16 @@ async function handleSubmission(adapter: BaseAdapter, submissionId: string | num
     }
 
     if (result.payload) {
-      console.log('[CodeRelay Content] Sending payload to background worker for GitHub sync...');
-      chrome.runtime.sendMessage(
-        {
-          type: 'SYNC_SUBMISSION',
-          payload: result.payload
-        },
-        (response) => {
-          console.log('[CodeRelay Content] Background response:', response);
-          if (response?.success) {
-            LeetCodeUI.setState('success', 'Pushed');
-          } else {
-            console.error('[CodeRelay Content] Sync failed:', response?.error);
-            LeetCodeUI.setState('error', response?.error || 'Push Failed');
-          }
-        }
-      );
+      console.log('[CodeRelay Content] Committing to GitHub directly from content script...');
+      const syncResult = await GitHubService.syncSubmission(result.payload);
+      console.log('[CodeRelay Content] Direct sync result:', syncResult);
+
+      if (syncResult.success) {
+        LeetCodeUI.setState('success', 'Pushed');
+      } else {
+        console.error('[CodeRelay Content] GitHub Sync Error:', syncResult.error);
+        LeetCodeUI.setState('error', syncResult.error || 'Push Failed');
+      }
     }
   } catch (err: any) {
     console.error('[CodeRelay Content] Exception while processing submission:', err);
@@ -92,6 +87,7 @@ function initContentScript() {
       return;
     }
 
+    console.log('[CodeRelay] Caught submission event with ID:', submissionId);
     lastSubmissionId = submissionId;
     handleSubmission(activeAdapter, submissionId);
   };

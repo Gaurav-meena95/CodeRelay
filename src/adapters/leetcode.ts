@@ -142,15 +142,21 @@ ${markdownContent}
       }
     `;
 
+    const isCN = window.location.hostname.includes('leetcode.cn');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    if (document.cookie) {
+      headers['cookie'] = document.cookie;
+    }
+
     const response = await fetch(endpoint, {
       method: 'POST',
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json'
-      },
+      headers,
       body: JSON.stringify({
         query,
-        variables: { submissionId },
+        variables: { submissionId: isCN ? submissionId.toString() : Number(submissionId) },
         operationName: 'submissionDetails'
       })
     });
@@ -160,7 +166,7 @@ ${markdownContent}
     }
 
     const json = await response.json();
-    return json?.data?.submissionDetails || null;
+    return json?.data?.submissionDetails || json?.data?.submissionDetail || null;
   }
 
   /**
