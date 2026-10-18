@@ -4,8 +4,14 @@
   "version": "1.0.0",
   "description": "Automatically sync your LeetCode, GFG, Codeforces, and CodeChef solutions to GitHub.",
   "action": {
+    "default_icon": "assets/icon.png",
     "default_popup": "src/popup/popup.html",
     "default_title": "CodeRelay Dashboard"
+  },
+  "icons": {
+    "16": "assets/icon.png",
+    "48": "assets/icon.png",
+    "128": "assets/icon.png"
   },
   "background": {
     "service_worker": "js/background.js",
