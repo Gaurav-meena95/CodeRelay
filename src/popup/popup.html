@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeRelay</title>
+  <link rel="stylesheet" href="./popup.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="brand">
+        <span class="logo-icon">⚡</span>
+        <div>
+          <h1 class="logo-text">CodeRelay</h1>
+          <span class="version">v1.0.0</span>
+        </div>
+      </div>
+      <div id="connection-badge" class="badge badge-disconnected">Checking...</div>
+    </header>
+
+    <main class="content">
+      <div id="auth-state" class="state-card hidden">
+        <p class="state-msg">CodeRelay is not connected to GitHub.</p>
+        <button id="btn-get-started" class="btn btn-primary">Connect GitHub</button>
+      </div>
+
+      <div id="dashboard-state" class="hidden">
+        <div class="card repo-card">
+          <div class="repo-info">
+            <span class="card-label">Linked Repository</span>
+            <a id="repo-link" href="#" target="_blank" class="repo-name">Loading...</a>
+          </div>
+          <div class="user-info">
+            <img id="user-avatar" class="avatar" src="" alt="Avatar" />
+            <span id="user-name" class="username"></span>
+          </div>
+        </div>
+
+        <div class="card toggle-card">
+          <div class="toggle-text">
+            <span class="toggle-title">Auto-Sync</span>
+            <span class="toggle-desc">Sync accepted submissions</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="sync-toggle" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="stats-section">
+          <span class="card-label">Synced Solutions</span>
+          <div class="stats-grid">
+            <div class="stat-box">
+              <span id="stat-total" class="stat-value">0</span>
+              <span class="stat-label">Total</span>
+            </div>
+            <div class="stat-box">
+              <span id="stat-leetcode" class="stat-value">0</span>
+              <span class="stat-label">LeetCode</span>
+            </div>
+            <div class="stat-box">
+              <span id="stat-gfg" class="stat-value">0</span>
+              <span class="stat-label">GFG</span>
+            </div>
+            <div class="stat-box">
+              <span id="stat-cf" class="stat-value">0</span>
+              <span class="stat-label">CF</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="actions">
+          <button id="btn-settings" class="btn btn-secondary">Settings</button>
+          <button id="btn-unlink" class="btn btn-danger">Unlink</button>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="./popup.ts"></script>
+</body>
+</html>

@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Setup CodeRelay</title>
+  <link rel="stylesheet" href="./welcome.css">
+</head>
+<body>
+  <div class="wrapper">
+    <div class="card onboarding-card">
+      <div class="header">
+        <span class="logo-icon">⚡</span>
+        <h1>Welcome to CodeRelay</h1>
+        <p class="subtitle">Connect your GitHub repository to start auto-syncing solutions.</p>
+      </div>
+
+      <div class="steps">
+        <!-- Step 1: Token Input -->
+        <div id="step-auth" class="step active">
+          <label class="input-label" for="token-input">GitHub Personal Access Token (Classic / Fine-grained)</label>
+          <p class="help-text">Requires <code>repo</code> scope to commit solutions and create folders.</p>
+          <div class="input-group">
+            <input type="password" id="token-input" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" autocomplete="off" />
+            <button id="btn-verify-token" class="btn btn-primary">Connect</button>
+          </div>
+          <a class="token-link" href="https://github.com/settings/tokens/new?description=CodeRelay&scopes=repo" target="_blank">
+            👉 Generate a token on GitHub (1-Click)
+          </a>
+          <p id="auth-error" class="error-msg hidden"></p>
+        </div>
+
+        <!-- Step 2: Repository Selection -->
+        <div id="step-repo" class="step hidden">
+          <div class="user-greeting">
+            <img id="connected-avatar" class="avatar" src="" alt="Avatar" />
+            <div>
+              <p class="connected-text">Connected as <strong id="connected-username"></strong></p>
+              <button id="btn-switch-account" class="link-btn">Use different token</button>
+            </div>
+          </div>
+
+          <label class="input-label" for="repo-select">Select Target Repository</label>
+          <select id="repo-select">
+            <option value="">-- Choose a repository --</option>
+          </select>
+
+          <p class="or-divider">OR</p>
+
+          <label class="input-label" for="custom-repo-input">Enter repository manually (owner/repo-name)</label>
+          <input type="text" id="custom-repo-input" placeholder="e.g. Gaurav-meena95/DSA-Solutions" />
+
+          <button id="btn-save-repo" class="btn btn-success">Save & Enable CodeRelay</button>
+          <p id="repo-error" class="error-msg hidden"></p>
+        </div>
+
+        <!-- Success confirmation -->
+        <div id="step-complete" class="step hidden text-center">
+          <div class="success-icon">🎉</div>
+          <h2>CodeRelay is Ready!</h2>
+          <p class="subtitle">Your accepted submissions on LeetCode will now automatically commit to GitHub.</p>
+          <button id="btn-close" class="btn btn-primary">Done</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="./welcome.ts"></script>
+</body>
+</html>
