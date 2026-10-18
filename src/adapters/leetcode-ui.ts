@@ -18,40 +18,45 @@ export class LeetCodeUI {
     style.id = 'coderelay-styles';
     style.textContent = `
       #${this.BUTTON_ID} {
-        display: inline-flex;
-        align-items: center;
-        gap: 6px;
-        padding: 3px 8px;
-        font-size: 12px;
-        font-weight: 500;
-        border-radius: 6px;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        background: rgba(255, 255, 255, 0.08);
-        color: #eff1f6;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        margin-right: 6px;
+        display: inline-flex !important;
+        align-items: center !important;
+        gap: 6px !important;
+        padding: 4px 10px !important;
+        font-size: 12px !important;
+        font-weight: 600 !important;
+        border-radius: 6px !important;
+        cursor: pointer !important;
+        transition: all 0.2s ease !important;
+        background: rgba(255, 255, 255, 0.08) !important;
+        color: #eff1f6 !important;
+        border: 1px solid rgba(255, 255, 255, 0.16) !important;
+        margin-right: 8px !important;
+        margin-left: 8px !important;
+        z-index: 10 !important;
+        line-height: 1.2 !important;
       }
       #${this.BUTTON_ID}:hover {
-        background: rgba(255, 255, 255, 0.15);
+        background: rgba(255, 255, 255, 0.18) !important;
+        border-color: rgba(255, 255, 255, 0.3) !important;
       }
       #${this.BUTTON_ID}.coderelay-success {
-        border-color: #10b981;
-        color: #10b981;
-        background: rgba(16, 185, 129, 0.12);
+        border-color: #10b981 !important;
+        color: #10b981 !important;
+        background: rgba(16, 185, 129, 0.16) !important;
       }
       #${this.BUTTON_ID}.coderelay-error {
-        border-color: #ef4444;
-        color: #ef4444;
-        background: rgba(239, 68, 68, 0.12);
+        border-color: #ef4444 !important;
+        color: #ef4444 !important;
+        background: rgba(239, 68, 68, 0.16) !important;
       }
       .${this.SPINNER_ID} {
-        width: 13px;
-        height: 13px;
-        border: 2px solid transparent;
-        border-top-color: #38bdf8;
-        border-radius: 50%;
-        animation: coderelay-spin 0.8s linear infinite;
+        width: 12px !important;
+        height: 12px !important;
+        border: 2px solid transparent !important;
+        border-top-color: #38bdf8 !important;
+        border-radius: 50% !important;
+        animation: coderelay-spin 0.8s linear infinite !important;
+        display: inline-block !important;
       }
       @keyframes coderelay-spin {
         100% { transform: rotate(360deg); }
@@ -70,36 +75,35 @@ export class LeetCodeUI {
 
     this.injectStyles();
 
-    // Look for target toolbar containers across various LeetCode versions
-    const selectors = [
-      'button[aria-label="Save note"]',
-      'button[id^="headlessui-listbox-button"]',
-      '.ml-auto',
-      '[class*="ml-auto"]',
-      'div[class*="flex items-center gap-1"]'
-    ];
-
-    let targetContainer: HTMLElement | null = null;
-
-    for (const selector of selectors) {
-      const el = document.querySelector(selector);
-      if (el) {
-        if (el.tagName === 'BUTTON') {
-          targetContainer = el.parentElement as HTMLElement;
-        } else {
-          targetContainer = el as HTMLElement;
-        }
-        break;
-      }
-    }
-
-    if (!targetContainer) {
+    // Priority 1: Toolbar right-side actions (.ml-auto or buttons container)
+    const rightActions = document.querySelector('.ml-auto, [class*="ml-auto"]');
+    if (rightActions) {
+      const btn = this.createButtonElement(onClick);
+      rightActions.prepend(btn);
       return;
     }
 
+    // Priority 2: Next to language picker
+    const langPicker = document.querySelector('button[id^="headlessui-listbox-button"]');
+    if (langPicker && langPicker.parentElement) {
+      const btn = this.createButtonElement(onClick);
+      langPicker.parentElement.appendChild(btn);
+      return;
+    }
+
+    // Priority 3: Note button or settings icon
+    const noteBtn = document.querySelector('button[aria-label="Save note"]') || document.querySelector('button[aria-label="Shortcuts"]');
+    if (noteBtn && noteBtn.parentElement) {
+      const btn = this.createButtonElement(onClick);
+      noteBtn.parentElement.prepend(btn);
+      return;
+    }
+  }
+
+  private static createButtonElement(onClick: () => void): HTMLElement {
     const btn = document.createElement('button');
     btn.id = this.BUTTON_ID;
-    btn.title = 'CodeRelay: Click to sync with GitHub';
+    btn.title = 'CodeRelay: Click to push solution to GitHub';
     btn.innerHTML = `
       <span id="coderelay-icon">⚡</span>
       <span id="coderelay-text">Push</span>
@@ -107,10 +111,11 @@ export class LeetCodeUI {
 
     btn.addEventListener('click', (e) => {
       e.preventDefault();
+      e.stopPropagation();
       onClick();
     });
 
-    targetContainer.prepend(btn);
+    return btn;
   }
 
   /**
@@ -149,7 +154,7 @@ export class LeetCodeUI {
 
       this.statusTimeout = setTimeout(() => {
         this.setState('idle');
-      }, 4500);
+      }, 5000);
     } else if (state === 'error') {
       btn.classList.add('coderelay-error');
       btn.style.pointerEvents = 'auto';
@@ -164,7 +169,7 @@ export class LeetCodeUI {
 
       this.statusTimeout = setTimeout(() => {
         this.setState('idle');
-      }, 4500);
+      }, 5000);
     } else {
       btn.style.pointerEvents = 'auto';
       iconSpan.textContent = '⚡';

@@ -111,12 +111,9 @@ ${markdownContent}
   }
 
   /**
-   * Queries LeetCode GraphQL API to obtain submission details and formats the payload.
+   * Fetches submission details from LeetCode GraphQL with cookie session.
    */
-  async processSubmission(submissionId: string | number): Promise<SubmissionResult | null> {
-    const isCN = window.location.hostname.includes('leetcode.cn');
-    const endpoint = isCN ? 'https://leetcode.cn/graphql/' : 'https://leetcode.com/graphql/';
-
+  private async fetchDetails(endpoint: string, submissionId: number): Promise<any> {
     const query = `
       query submissionDetails($submissionId: Int!) {
         submissionDetails(submissionId: $submissionId) {
@@ -147,12 +144,13 @@ ${markdownContent}
 
     const response = await fetch(endpoint, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         query,
-        variables: { submissionId: Number(submissionId) },
+        variables: { submissionId },
         operationName: 'submissionDetails'
       })
     });
@@ -162,9 +160,41 @@ ${markdownContent}
     }
 
     const json = await response.json();
-    const details = json?.data?.submissionDetails;
+    return json?.data?.submissionDetails || null;
+  }
+
+  /**
+   * Polls LeetCode GraphQL until judging completes (up to 15 seconds).
+   */
+  async processSubmission(submissionId: string | number): Promise<SubmissionResult | null> {
+    const isCN = window.location.hostname.includes('leetcode.cn');
+    const endpoint = isCN ? 'https://leetcode.cn/graphql/' : 'https://leetcode.com/graphql/';
+    const subNum = Number(submissionId);
+
+    console.log('[CodeRelay] Polling submission details for ID:', subNum);
+
+    let details: any = null;
+    const maxPollAttempts = 15;
+
+    for (let attempt = 1; attempt <= maxPollAttempts; attempt++) {
+      try {
+        details = await this.fetchDetails(endpoint, subNum);
+
+        // Check if judging finished (statusCode exists and is not null/0/pending)
+        if (details && details.statusCode !== null && details.statusCode !== undefined && details.statusCode !== 0) {
+          console.log('[CodeRelay] Submission judging completed on attempt', attempt, 'Status:', details.statusCode);
+          break;
+        }
+      } catch (err) {
+        console.warn(`[CodeRelay] Attempt ${attempt} fetch failed:`, err);
+      }
+
+      // Wait 1 second before checking again
+      await new Promise(r => setTimeout(r, 1000));
+    }
 
     if (!details) {
+      console.error('[CodeRelay] Submission details could not be retrieved');
       return null;
     }
 
@@ -172,6 +202,7 @@ ${markdownContent}
     const statusText = STATUS_MAP[details.statusCode] || (isAccepted ? 'Accepted' : 'Failed');
 
     if (!isAccepted) {
+      console.log('[CodeRelay] Submission rejected:', statusText);
       return {
         accepted: false,
         statusDisplay: statusText

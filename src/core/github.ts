@@ -42,8 +42,9 @@ export class GitHubService {
    * Generates standard GitHub API request headers.
    */
   private static getHeaders(token: string): HeadersInit {
+    const auth = token.startsWith('ghp_') ? `token ${token}` : `Bearer ${token}`;
     return {
-      Authorization: `Bearer ${token}`,
+      Authorization: auth,
       Accept: 'application/vnd.github.v3+json',
       'Content-Type': 'application/json'
     };

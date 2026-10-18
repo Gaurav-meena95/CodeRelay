@@ -12,40 +12,45 @@ let lastSubmissionId: string | number | null = null;
  * Handles submission processing and updates the Push button visual indicator.
  */
 async function handleSubmission(adapter: BaseAdapter, submissionId: string | number) {
+  console.log('[CodeRelay Content] Handling submission ID:', submissionId);
   LeetCodeUI.setState('loading', 'Pushing...');
 
   try {
     const result = await adapter.processSubmission(submissionId);
 
     if (!result) {
+      console.warn('[CodeRelay Content] No result returned from adapter');
       LeetCodeUI.setState('error', 'Failed');
       return;
     }
 
     if (!result.accepted) {
-      // Wrong answer, TLE, Compile Error -> Show red cross
-      LeetCodeUI.setState('error', result.statusDisplay || 'Failed');
+      console.log('[CodeRelay Content] Submission not accepted:', result.statusDisplay);
+      LeetCodeUI.setState('error', result.statusDisplay || 'Wrong Answer');
       return;
     }
 
     if (result.payload) {
+      console.log('[CodeRelay Content] Sending payload to background worker for GitHub sync...');
       chrome.runtime.sendMessage(
         {
           type: 'SYNC_SUBMISSION',
           payload: result.payload
         },
         (response) => {
+          console.log('[CodeRelay Content] Background response:', response);
           if (response?.success) {
-            // Correct and synced to GitHub -> Show green tick!
             LeetCodeUI.setState('success', 'Pushed');
           } else {
-            LeetCodeUI.setState('error', 'Push Failed');
+            console.error('[CodeRelay Content] Sync failed:', response?.error);
+            LeetCodeUI.setState('error', response?.error || 'Push Failed');
           }
         }
       );
     }
-  } catch {
-    LeetCodeUI.setState('error', 'Error');
+  } catch (err: any) {
+    console.error('[CodeRelay Content] Exception while processing submission:', err);
+    LeetCodeUI.setState('error', err.message || 'Error');
   }
 }
 
@@ -53,6 +58,8 @@ async function handleSubmission(adapter: BaseAdapter, submissionId: string | num
  * Initializes listeners for intercepted submission events and sets up UI injection.
  */
 function initContentScript() {
+  console.log('[CodeRelay] Content script initialized on:', window.location.href);
+
   const currentUrl = window.location.href;
   const activeAdapter = adapters.find(adapter => adapter.canHandle(currentUrl));
 
@@ -76,8 +83,8 @@ function initContentScript() {
   tryInject();
   setInterval(tryInject, 1500);
 
-  // Listen for submission events triggered by the interceptor
-  window.addEventListener('codeRelaySubmission', async (event: Event) => {
+  // Common event handler for submission events
+  const onSubmissionEvent = (event: Event) => {
     const customEvent = event as CustomEvent<{ platform: string; submissionId: string | number }>;
     const { submissionId } = customEvent.detail || {};
 
@@ -87,7 +94,10 @@ function initContentScript() {
 
     lastSubmissionId = submissionId;
     handleSubmission(activeAdapter, submissionId);
-  });
+  };
+
+  window.addEventListener('codeRelaySubmission', onSubmissionEvent);
+  document.addEventListener('codeRelaySubmission', onSubmissionEvent);
 }
 
 initContentScript();

@@ -36,9 +36,11 @@ function showStatusBadge(text: string, color: string) {
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'SYNC_SUBMISSION') {
     const payload = message.payload as SubmissionPayload;
+    console.log('[CodeRelay Background] Received submission payload for:', payload.title, payload.platform);
 
     GitHubService.syncSubmission(payload)
       .then(result => {
+        console.log('[CodeRelay Background] GitHub sync result:', result);
         if (result.success) {
           showStatusBadge('✓', '#10b981');
         } else {
@@ -47,6 +49,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse(result);
       })
       .catch(err => {
+        console.error('[CodeRelay Background] Error during syncSubmission:', err);
         showStatusBadge('!', '#ef4444');
         sendResponse({ success: false, error: err.message });
       });
