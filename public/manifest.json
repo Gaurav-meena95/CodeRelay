@@ -26,6 +26,8 @@
     "https://leetcode.cn/*",
     "https://geeksforgeeks.org/*",
     "https://*.geeksforgeeks.org/*",
+    "https://codechef.com/*",
+    "https://*.codechef.com/*",
     "https://codeforces.com/*",
     "https://api.github.com/*",
     "https://github.com/*"
@@ -37,6 +39,8 @@
         "https://leetcode.cn/*",
         "https://geeksforgeeks.org/*",
         "https://*.geeksforgeeks.org/*",
+        "https://codechef.com/*",
+        "https://*.codechef.com/*",
         "https://codeforces.com/*"
       ],
       "js": [
@@ -51,6 +55,8 @@
         "https://leetcode.cn/*",
         "https://geeksforgeeks.org/*",
         "https://*.geeksforgeeks.org/*",
+        "https://codechef.com/*",
+        "https://*.codechef.com/*",
         "https://codeforces.com/*"
       ],
       "js": [
@@ -69,6 +75,8 @@
         "https://leetcode.cn/*",
         "https://geeksforgeeks.org/*",
         "https://*.geeksforgeeks.org/*",
+        "https://codechef.com/*",
+        "https://*.codechef.com/*",
         "https://codeforces.com/*"
       ]
     }

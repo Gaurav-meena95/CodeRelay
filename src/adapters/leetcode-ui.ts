@@ -83,23 +83,23 @@ export class LeetCodeUI {
       return;
     }
 
-    // Priority 2: GeeksforGeeks Submit or Compile Button
+    // Priority 2: GFG / CodeChef Submit or Run Button
     const allButtons = Array.from(document.querySelectorAll('button'));
-    const gfgActionBtn = allButtons.find(b => {
+    const actionBtn = allButtons.find(b => {
       const txt = (b.textContent || '').trim().toLowerCase();
-      return txt === 'submit' || txt === 'compile & run' || txt === 'compile';
+      return txt === 'submit' || txt === 'compile & run' || txt === 'compile' || txt === 'run';
     });
-    if (gfgActionBtn && gfgActionBtn.parentElement) {
+    if (actionBtn && actionBtn.parentElement) {
       const btn = this.createButtonElement(onClick);
-      gfgActionBtn.parentElement.insertBefore(btn, gfgActionBtn);
+      actionBtn.parentElement.insertBefore(btn, actionBtn);
       return;
     }
 
-    // Priority 2b: GeeksforGeeks Compiler Bar / Toolbar Container
-    const gfgBar = document.querySelector('[class*="compiler_actions"], [class*="compile_run"], .compiler-button-wrapper, [class*="problem-tab__actions"], .problems_header_content__title');
-    if (gfgBar) {
+    // Priority 2b: GFG / CodeChef Compiler Bar / IDE Header Container
+    const actionToolbar = document.querySelector('[class*="compiler_actions"], [class*="compile_run"], .compiler-button-wrapper, [class*="problem-tab__actions"], [class*="ide-header"], [class*="editor-actions"], .problems_header_content__title');
+    if (actionToolbar) {
       const btn = this.createButtonElement(onClick);
-      gfgBar.appendChild(btn);
+      actionToolbar.appendChild(btn);
       return;
     }
 

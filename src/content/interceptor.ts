@@ -57,6 +57,17 @@
       } catch {}
     }
 
+    // 4. CodeChef Submissions
+    if (url.includes('codechef.com') && (url.includes('/submit') || url.includes('/run') || url.includes('/api/'))) {
+      try {
+        const cloned = response.clone();
+        const data = await cloned.json();
+        if (data?.status === 'SUCCESS' || data?.result === 'SUCCESS' || data?.submission_id || data?.upstatus) {
+          dispatchSubmission(data?.submission_id || Date.now(), 'codechef');
+        }
+      } catch {}
+    }
+
     return response;
   };
 
@@ -87,6 +98,15 @@
           const data = JSON.parse(this.responseText);
           if (data?.status === 'SUCCESS' || data?.message?.includes('Successfully') || data?.submission_id || data?.sub_id) {
             dispatchSubmission(data?.submission_id || data?.sub_id || Date.now(), 'gfg');
+          }
+        } catch {}
+      }
+
+      if (url.includes('codechef.com') && (url.includes('/submit') || url.includes('/run') || url.includes('/api/'))) {
+        try {
+          const data = JSON.parse(this.responseText);
+          if (data?.status === 'SUCCESS' || data?.result === 'SUCCESS' || data?.submission_id || data?.upstatus) {
+            dispatchSubmission(data?.submission_id || Date.now(), 'codechef');
           }
         } catch {}
       }
