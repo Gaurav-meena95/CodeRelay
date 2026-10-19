@@ -13,6 +13,19 @@ const GFG_LANGUAGE_EXTENSIONS: Record<string, string> = {
   'c#': 'cs'
 };
 
+interface GfgApiResponse {
+  results?: {
+    problem_name?: string;
+    difficulty?: string;
+    problem_level_text?: string;
+    problem_question?: string;
+    tags?: {
+      topic_tags?: string[];
+      company_tags?: string[];
+    };
+  };
+}
+
 export class GfgAdapter implements BaseAdapter {
   platform = 'gfg' as const;
 
@@ -28,24 +41,29 @@ export class GfgAdapter implements BaseAdapter {
    */
   private htmlToMarkdown(html: string): string {
     return html
-      .replace(/<pre>[\s\S]*?<\/pre>/gi, match => {
-        const text = match.replace(/<\/?pre>/gi, '').replace(/<\/?code>/gi, '');
-        return `\n\`\`\`\n${text.trim()}\n\`\`\`\n`;
+      .replace(/<pre[^>]*>([\s\S]*?)<\/pre>/gi, (_, text) => {
+        const clean = text.replace(/<[^>]+>/g, '').trim();
+        return `\n\`\`\`\n${clean}\n\`\`\`\n`;
       })
       .replace(/<code>(.*?)<\/code>/gi, '`$1`')
       .replace(/<strong>(.*?)<\/strong>/gi, '**$1**')
       .replace(/<b>(.*?)<\/b>/gi, '**$1**')
       .replace(/<em>(.*?)<\/em>/gi, '*$1*')
-      .replace(/<p>/gi, '\n\n')
+      .replace(/<i>(.*?)<\/i>/gi, '*$1*')
+      .replace(/<p[^>]*>/gi, '\n\n')
       .replace(/<\/p>/gi, '')
       .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/<li>(.*?)<\/li>/gi, '- $1\n')
+      .replace(/<li[^>]*>(.*?)<\/li>/gi, '- $1\n')
       .replace(/<[^>]+>/g, '')
       .replace(/&nbsp;/g, ' ')
       .replace(/&lt;/g, '<')
       .replace(/&gt;/g, '>')
       .replace(/&amp;/g, '&')
-      .replace(/\n\s*\n\s*\n/g, '\n\n')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&le;/g, '<=')
+      .replace(/&ge;/g, '>=')
+      .replace(/\n\s*\n\s*\n+/g, '\n\n')
       .trim();
   }
 
@@ -80,7 +98,7 @@ export class GfgAdapter implements BaseAdapter {
       }
     }
 
-    // 3. Fallback: DOM text contents in code lines
+    // 3. Fallback: DOM text contents in code lines excluding autocomplete popups
     const codeLines = document.querySelectorAll('.ace_editor .ace_line, .monaco-editor .lines-content .view-lines .view-line');
     if (codeLines && codeLines.length > 0) {
       const lines: string[] = [];
@@ -99,33 +117,57 @@ export class GfgAdapter implements BaseAdapter {
   }
 
   /**
-   * Extracts problem title, slug, and difficulty from the page DOM.
+   * Normalizes raw difficulty string to standard ProblemDifficulty.
    */
-  private getProblemMeta() {
-    // Title
-    const titleEl = document.querySelector('[class*="problem_title"], .problems_header_content__title, .problem-tab__name, h3.font-weight-bold');
+  private normalizeDifficulty(diffRaw?: string): ProblemDifficulty {
+    const text = (diffRaw || '').toLowerCase();
+    if (text.includes('hard')) return 'Hard';
+    if (text.includes('medium')) return 'Medium';
+    return 'Easy';
+  }
+
+  /**
+   * Fetches problem details directly from GFG practice API.
+   */
+  private async fetchProblemFromApi(slug: string): Promise<GfgApiResponse['results'] | null> {
+    try {
+      const apiUrl = `https://practiceapi.geeksforgeeks.org/api/v1/problems/${slug}/`;
+      const response = await fetch(apiUrl);
+      if (!response.ok) {
+        return null;
+      }
+      const data: GfgApiResponse = await response.json();
+      return data?.results || null;
+    } catch (err) {
+      console.warn('[CodeRelay GFG] Failed to fetch problem from GFG API:', err);
+      return null;
+    }
+  }
+
+  /**
+   * Extracts problem metadata from DOM as fallback.
+   */
+  private getProblemMetaFromDOM(slug: string) {
+    const titleEl = document.querySelector(
+      '[class*="problems_header_content__title"], [class*="problem-title"], [class*="problem_title"], h1, h3.font-weight-bold'
+    );
     let title = titleEl?.textContent?.trim() || '';
 
-    // Slug from URL: /problems/subarray-with-given-sum-1587115621/1
-    const match = window.location.pathname.match(/\/problems\/([^/]+)/);
-    const problemSlug = match ? match[1] : title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-
     if (!title) {
-      title = problemSlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      // Strip trailing numeric suffixes (e.g., 'palindrome-string0817' -> 'Palindrome String')
+      const cleanSlug = slug.replace(/[-_]?\d+$/, '');
+      title = cleanSlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     }
 
-    // Difficulty
     const diffEl = document.querySelector('.problem-tab__difficulty, [class*="difficulty"], [class*="badge"]');
-    const diffText = (diffEl?.textContent?.trim() || 'Medium').toLowerCase();
-    const difficulty: ProblemDifficulty = diffText.includes('easy') ? 'Easy' :
-                                         diffText.includes('hard') ? 'Hard' :
-                                         diffText.includes('basic') || diffText.includes('school') ? 'Easy' : 'Medium';
+    const difficulty = this.normalizeDifficulty(diffEl?.textContent?.trim());
 
-    // Description HTML
-    const descEl = document.querySelector('.problem-statement, [class*="problem-statement"], .problems_problem_content');
+    const descEl = document.querySelector(
+      '[class*="problems_problem_content"], [class*="problem-statement"], [class*="problems_content"], [class*="problemDescription"]'
+    );
     const contentHtml = descEl?.innerHTML || '';
 
-    return { title, problemSlug, difficulty, contentHtml };
+    return { title, difficulty, contentHtml, topicTags: [] as string[], companyTags: [] as string[] };
   }
 
   /**
@@ -137,7 +179,33 @@ export class GfgAdapter implements BaseAdapter {
     // Give GFG results 0.5s to settle into the DOM
     await new Promise(r => setTimeout(r, 500));
 
-    const meta = this.getProblemMeta();
+    // Extract slug from URL: /problems/palindrome-string0817/1
+    const match = window.location.pathname.match(/\/problems\/([^/]+)/);
+    const problemSlug = match ? match[1] : 'problem';
+
+    // 1. Primary: Fetch problem details from GFG API
+    const apiData = await this.fetchProblemFromApi(problemSlug);
+
+    let title: string;
+    let difficulty: ProblemDifficulty;
+    let contentHtml: string;
+    let topicTags: string[] = [];
+    let companyTags: string[] = [];
+
+    if (apiData && (apiData.problem_name || apiData.problem_question)) {
+      title = apiData.problem_name || problemSlug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      difficulty = this.normalizeDifficulty(apiData.difficulty || apiData.problem_level_text);
+      contentHtml = apiData.problem_question || '';
+      topicTags = apiData.tags?.topic_tags || [];
+      companyTags = apiData.tags?.company_tags || [];
+    } else {
+      // 2. Fallback: Parse from page DOM
+      const domMeta = this.getProblemMetaFromDOM(problemSlug);
+      title = domMeta.title;
+      difficulty = domMeta.difficulty;
+      contentHtml = domMeta.contentHtml;
+    }
+
     const code = capturedCode?.trim() ? capturedCode : this.getCodeFromDOM();
 
     if (!code) {
@@ -153,23 +221,31 @@ export class GfgAdapter implements BaseAdapter {
     const langName = (langPicker?.textContent?.trim() || 'C++').toLowerCase();
     const extension = GFG_LANGUAGE_EXTENSIONS[langName] || 'cpp';
 
-    const markdownContent = this.htmlToMarkdown(meta.contentHtml);
+    const markdownContent = this.htmlToMarkdown(contentHtml);
     const problemUrl = window.location.href;
+    const diffColor = difficulty === 'Easy' ? 'brightgreen' : difficulty === 'Medium' ? 'orange' : 'red';
 
-    const descriptionMarkdown = `# [${meta.title}](${problemUrl})
+    let descriptionMarkdown = `# [${title}](${problemUrl})\n\n`;
+    descriptionMarkdown += `![Difficulty: ${difficulty}](https://img.shields.io/badge/Difficulty-${difficulty}-${diffColor})\n\n`;
 
-![Difficulty: ${meta.difficulty}](https://img.shields.io/badge/Difficulty-${meta.difficulty}-orange)
+    if (topicTags.length > 0) {
+      const topicBadges = topicTags.map(t => `\`${t}\``).join(' ');
+      descriptionMarkdown += `## Topic Tags\n${topicBadges}\n\n`;
+    }
 
-## Problem Description
-${markdownContent}
-`;
+    if (companyTags.length > 0) {
+      const companyBadges = companyTags.map(c => `\`${c}\``).join(' ');
+      descriptionMarkdown += `## Company Tags\n${companyBadges}\n\n`;
+    }
+
+    descriptionMarkdown += `## Problem Description\n${markdownContent}\n`;
 
     const payload: SubmissionPayload = {
       platform: 'gfg',
       problemId: '',
-      problemSlug: meta.problemSlug,
-      title: meta.title,
-      difficulty: meta.difficulty,
+      problemSlug,
+      title,
+      difficulty,
       language: langName.toUpperCase(),
       extension,
       code,

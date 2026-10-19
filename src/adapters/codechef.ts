@@ -151,6 +151,23 @@ export class CodeChefAdapter implements BaseAdapter {
   }
 
   /**
+   * Fetches problem statement from CodeChef practice API if DOM statement is empty.
+   */
+  private async fetchProblemFromApi(code: string): Promise<{ title?: string; body?: string } | null> {
+    try {
+      const response = await fetch(`https://www.codechef.com/api/contests/PRACTICE/problems/${code}`);
+      if (!response.ok) return null;
+      const data = await response.json();
+      return {
+        title: data?.problem_name,
+        body: data?.body
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Processes a CodeChef submission and packages the payload.
    */
   async processSubmission(submissionId: string | number, capturedCode?: string | null): Promise<SubmissionResult | null> {
@@ -160,6 +177,17 @@ export class CodeChefAdapter implements BaseAdapter {
     await new Promise(r => setTimeout(r, 500));
 
     const meta = this.getProblemMeta();
+    let title = meta.title;
+    let contentHtml = meta.contentHtml;
+
+    if (!contentHtml) {
+      const apiData = await this.fetchProblemFromApi(meta.problemCode);
+      if (apiData) {
+        if (apiData.title) title = `${meta.problemCode} - ${apiData.title}`;
+        if (apiData.body) contentHtml = apiData.body;
+      }
+    }
+
     const code = capturedCode?.trim() ? capturedCode : this.getCodeFromDOM();
 
     if (!code) {
@@ -171,10 +199,10 @@ export class CodeChefAdapter implements BaseAdapter {
     }
 
     const lang = this.getLanguage();
-    const markdownContent = this.htmlToMarkdown(meta.contentHtml);
+    const markdownContent = this.htmlToMarkdown(contentHtml);
     const problemUrl = window.location.href;
 
-    const descriptionMarkdown = `# [${meta.problemCode} - ${meta.title}](${problemUrl})
+    const descriptionMarkdown = `# [${title}](${problemUrl})
 
 ![Difficulty: ${meta.difficulty}](https://img.shields.io/badge/Difficulty-${meta.difficulty}-orange)
 
@@ -186,7 +214,7 @@ ${markdownContent}
       platform: 'codechef',
       problemId: meta.problemCode,
       problemSlug: meta.problemCode.toLowerCase(),
-      title: `${meta.problemCode} - ${meta.title}`,
+      title,
       difficulty: meta.difficulty,
       language: lang.name,
       extension: lang.extension,
