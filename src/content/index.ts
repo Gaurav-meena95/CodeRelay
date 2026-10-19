@@ -1,9 +1,11 @@
 import { LeetCodeAdapter } from '../adapters/leetcode';
+import { GfgAdapter } from '../adapters/gfg';
 import { LeetCodeUI } from '../adapters/leetcode-ui';
 import { BaseAdapter } from '../adapters/base-adapter';
 
 const adapters: BaseAdapter[] = [
-  new LeetCodeAdapter()
+  new LeetCodeAdapter(),
+  new GfgAdapter()
 ];
 
 let lastSubmissionId: string | number | null = null;
@@ -12,7 +14,7 @@ let lastSubmissionId: string | number | null = null;
  * Handles submission processing and sends payload to background service worker.
  */
 async function handleSubmission(adapter: BaseAdapter, submissionId: string | number) {
-  console.log('[CodeRelay Content] Handling submission ID:', submissionId);
+  console.log(`[CodeRelay Content] Handling ${adapter.platform.toUpperCase()} submission ID:`, submissionId);
   LeetCodeUI.setState('loading', 'Pushing...');
 
   try {
@@ -74,7 +76,8 @@ function initContentScript() {
         if (lastSubmissionId) {
           handleSubmission(activeAdapter, lastSubmissionId);
         } else {
-          LeetCodeUI.setState('error', 'Submit first');
+          // On GFG or LeetCode, allow direct push of current editor content
+          handleSubmission(activeAdapter, Date.now());
         }
       });
     }
@@ -86,15 +89,17 @@ function initContentScript() {
   // Common event handler for submission events
   const onSubmissionEvent = (event: Event) => {
     const customEvent = event as CustomEvent<{ platform: string; submissionId: string | number }>;
-    const { submissionId } = customEvent.detail || {};
+    const { platform, submissionId } = customEvent.detail || {};
 
     if (!submissionId) {
       return;
     }
 
-    console.log('[CodeRelay] Caught submission event with ID:', submissionId);
+    console.log('[CodeRelay] Caught submission event:', platform, submissionId);
     lastSubmissionId = submissionId;
-    handleSubmission(activeAdapter, submissionId);
+
+    const targetAdapter = adapters.find(a => a.platform === platform) || activeAdapter;
+    handleSubmission(targetAdapter, submissionId);
   };
 
   window.addEventListener('codeRelaySubmission', onSubmissionEvent);

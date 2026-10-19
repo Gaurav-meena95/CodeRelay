@@ -24,6 +24,8 @@
   "host_permissions": [
     "https://leetcode.com/*",
     "https://leetcode.cn/*",
+    "https://*.geeksforgeeks.org/*",
+    "https://codeforces.com/*",
     "https://api.github.com/*",
     "https://github.com/*"
   ],
@@ -31,7 +33,9 @@
     {
       "matches": [
         "https://leetcode.com/*",
-        "https://leetcode.cn/*"
+        "https://leetcode.cn/*",
+        "https://*.geeksforgeeks.org/*",
+        "https://codeforces.com/*"
       ],
       "js": [
         "js/interceptor.js"
@@ -42,7 +46,9 @@
     {
       "matches": [
         "https://leetcode.com/*",
-        "https://leetcode.cn/*"
+        "https://leetcode.cn/*",
+        "https://*.geeksforgeeks.org/*",
+        "https://codeforces.com/*"
       ],
       "js": [
         "js/content.js"
@@ -57,7 +63,9 @@
       ],
       "matches": [
         "https://leetcode.com/*",
-        "https://leetcode.cn/*"
+        "https://leetcode.cn/*",
+        "https://*.geeksforgeeks.org/*",
+        "https://codeforces.com/*"
       ]
     }
   ]

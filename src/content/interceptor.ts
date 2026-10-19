@@ -1,12 +1,12 @@
 /**
- * Intercepts network calls in the page context to capture submission triggers.
+ * Intercepts network calls in the page context to capture submission triggers across LeetCode and GFG.
  */
 (function initCodeRelayInterceptor() {
   const originalFetch = window.fetch;
 
-  function dispatchSubmission(submissionId: string | number) {
-    console.log('[CodeRelay Interceptor] Captured Submission ID:', submissionId);
-    const detail = { platform: 'leetcode', submissionId };
+  function dispatchSubmission(submissionId: string | number, platform = 'leetcode') {
+    console.log(`[CodeRelay Interceptor] Captured ${platform.toUpperCase()} Submission ID:`, submissionId);
+    const detail = { platform, submissionId };
     window.dispatchEvent(new CustomEvent('codeRelaySubmission', { detail }));
     document.dispatchEvent(new CustomEvent('codeRelaySubmission', { detail }));
   }
@@ -17,20 +17,21 @@
 
     const response = await originalFetch.apply(this, args);
 
+    // 1. LeetCode Submissions
     if (url.includes('/problems/') && url.includes('/submit/')) {
       try {
         const cloned = response.clone();
         const data = await cloned.json();
         const subId = data?.submission_id || data?.submissionId;
         if (subId) {
-          dispatchSubmission(subId);
+          dispatchSubmission(subId, 'leetcode');
         }
       } catch (err) {
-        console.error('[CodeRelay Interceptor] Failed to parse submit response:', err);
+        console.error('[CodeRelay Interceptor] Failed to parse LeetCode submit response:', err);
       }
     }
 
-    // Also support GraphQL submission mutations
+    // 2. LeetCode GraphQL Mutations
     if (url.includes('/graphql/') && options?.method === 'POST') {
       try {
         const body = JSON.parse(options?.body as string || '{}');
@@ -39,12 +40,21 @@
           const data = await cloned.json();
           const subId = data?.data?.submitQuestion?.submissionId || data?.data?.submissionId;
           if (subId) {
-            dispatchSubmission(subId);
+            dispatchSubmission(subId, 'leetcode');
           }
         }
-      } catch {
-        // Ignore non-json GraphQL payloads
-      }
+      } catch {}
+    }
+
+    // 3. GeeksforGeeks Submissions
+    if (url.includes('geeksforgeeks.org') && (url.includes('/submit') || url.includes('/compile') || url.includes('/problems/'))) {
+      try {
+        const cloned = response.clone();
+        const data = await cloned.json();
+        if (data?.status === 'SUCCESS' || data?.message?.includes('Successfully') || data?.submission_id || data?.sub_id) {
+          dispatchSubmission(data?.submission_id || data?.sub_id || Date.now(), 'gfg');
+        }
+      } catch {}
     }
 
     return response;
@@ -61,16 +71,24 @@
   XMLHttpRequest.prototype.send = function (...args) {
     this.addEventListener('load', function () {
       const url: string = (this as any)._coderelay_url || '';
+
       if (url.includes('/problems/') && url.includes('/submit/')) {
         try {
           const data = JSON.parse(this.responseText);
           const subId = data?.submission_id || data?.submissionId;
           if (subId) {
-            dispatchSubmission(subId);
+            dispatchSubmission(subId, 'leetcode');
           }
-        } catch {
-          // Ignore invalid JSON
-        }
+        } catch {}
+      }
+
+      if (url.includes('geeksforgeeks.org') && (url.includes('/submit') || url.includes('/compile'))) {
+        try {
+          const data = JSON.parse(this.responseText);
+          if (data?.status === 'SUCCESS' || data?.message?.includes('Successfully') || data?.submission_id || data?.sub_id) {
+            dispatchSubmission(data?.submission_id || data?.sub_id || Date.now(), 'gfg');
+          }
+        } catch {}
       }
     });
 

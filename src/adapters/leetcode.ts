@@ -179,6 +179,9 @@ ${markdownContent}
 
     console.log('[CodeRelay] Polling submission details for ID:', subNum);
 
+    // Initial wait to let LeetCode test cases start evaluating
+    await new Promise(r => setTimeout(r, 1500));
+
     let details: any = null;
     const maxPollAttempts = 15;
 
@@ -206,6 +209,11 @@ ${markdownContent}
 
     const isAccepted = details.statusCode === 10;
     const statusText = STATUS_MAP[details.statusCode] || (isAccepted ? 'Accepted' : 'Failed');
+
+    if (isAccepted) {
+      // 0.5 sec delay as requested once submission is successfully accepted
+      await new Promise(r => setTimeout(r, 500));
+    }
 
     if (!isAccepted) {
       console.log('[CodeRelay] Submission rejected:', statusText);

@@ -83,15 +83,23 @@ export class LeetCodeUI {
       return;
     }
 
-    // Priority 2: Next to language picker
-    const langPicker = document.querySelector('button[id^="headlessui-listbox-button"]');
+    // Priority 2: GeeksforGeeks Compiler Bar / Run Button
+    const gfgRunBtn = document.querySelector('button[class*="run-button"], .compiler-button-wrapper, [class*="compiler_actions"]');
+    if (gfgRunBtn && gfgRunBtn.parentElement) {
+      const btn = this.createButtonElement(onClick);
+      gfgRunBtn.parentElement.prepend(btn);
+      return;
+    }
+
+    // Priority 3: Next to language picker (LeetCode or GFG)
+    const langPicker = document.querySelector('button[id^="headlessui-listbox-button"], .select-language, [class*="language-select"]');
     if (langPicker && langPicker.parentElement) {
       const btn = this.createButtonElement(onClick);
       langPicker.parentElement.appendChild(btn);
       return;
     }
 
-    // Priority 3: Note button or settings icon
+    // Priority 4: Note button or settings icon
     const noteBtn = document.querySelector('button[aria-label="Save note"]') || document.querySelector('button[aria-label="Shortcuts"]');
     if (noteBtn && noteBtn.parentElement) {
       const btn = this.createButtonElement(onClick);
