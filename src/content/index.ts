@@ -38,10 +38,36 @@ async function queryMainWorldCode(): Promise<string | null> {
   });
 }
 
+let isProcessingSubmission = false;
+let lastProcessedSubId: string | number | null = null;
+let lastProcessedTime = 0;
+
 /**
  * Handles submission processing and sends payload to background service worker.
  */
 async function handleSubmission(adapter: BaseAdapter, submissionId: string | number, capturedCode?: string | null) {
+  // Prevent duplicate concurrent executions or rapid duplicate events
+  if (isProcessingSubmission) {
+    console.log('[CodeRelay Content] Already processing a submission, skipping duplicate.');
+    return;
+  }
+
+  if (lastProcessedSubId === submissionId && Date.now() - lastProcessedTime < 5000) {
+    console.log('[CodeRelay Content] Duplicate submission event ignored:', submissionId);
+    return;
+  }
+
+  // Guard against invalidated extension context (e.g. extension reloaded without page refresh)
+  if (typeof chrome === 'undefined' || !chrome?.runtime?.sendMessage) {
+    console.warn('[CodeRelay Content] Extension context was reloaded. Please refresh this tab.');
+    LeetCodeUI.setState('error', 'Please refresh page');
+    return;
+  }
+
+  isProcessingSubmission = true;
+  lastProcessedSubId = submissionId;
+  lastProcessedTime = Date.now();
+
   console.log(`[CodeRelay Content] Handling ${adapter.platform.toUpperCase()} submission ID:`, submissionId);
   LeetCodeUI.setState('loading', 'Pushing...');
 
@@ -67,25 +93,37 @@ async function handleSubmission(adapter: BaseAdapter, submissionId: string | num
 
     if (result.payload) {
       console.log('[CodeRelay Content] Sending submission to background for GitHub sync...');
-      chrome.runtime.sendMessage(
-        {
-          type: 'SYNC_SUBMISSION',
-          payload: result.payload
-        },
-        (response) => {
-          console.log('[CodeRelay Content] Background commit response:', response);
-          if (response?.success) {
-            LeetCodeUI.setState('success', 'Pushed');
-          } else {
-            console.error('[CodeRelay Content] GitHub Sync Error:', response?.error);
-            LeetCodeUI.setState('error', response?.error || 'Push Failed');
+      try {
+        chrome.runtime.sendMessage(
+          {
+            type: 'SYNC_SUBMISSION',
+            payload: result.payload
+          },
+          (response) => {
+            if (chrome?.runtime?.lastError) {
+              console.error('[CodeRelay Content] Chrome runtime error:', chrome.runtime.lastError.message);
+              LeetCodeUI.setState('error', 'Please refresh page');
+              return;
+            }
+            console.log('[CodeRelay Content] Background commit response:', response);
+            if (response?.success) {
+              LeetCodeUI.setState('success', 'Pushed');
+            } else {
+              console.error('[CodeRelay Content] GitHub Sync Error:', response?.error);
+              LeetCodeUI.setState('error', response?.error || 'Push Failed');
+            }
           }
-        }
-      );
+        );
+      } catch (sendErr: any) {
+        console.error('[CodeRelay Content] SendMessage failed:', sendErr);
+        LeetCodeUI.setState('error', 'Please refresh page');
+      }
     }
   } catch (err: any) {
     console.error('[CodeRelay Content] Exception while processing submission:', err);
     LeetCodeUI.setState('error', err.message || 'Error');
+  } finally {
+    isProcessingSubmission = false;
   }
 }
 
@@ -157,7 +195,6 @@ function initContentScript() {
   }
 
   window.addEventListener('codeRelaySubmission', onSubmissionEvent);
-  document.addEventListener('codeRelaySubmission', onSubmissionEvent);
 }
 
 initContentScript();

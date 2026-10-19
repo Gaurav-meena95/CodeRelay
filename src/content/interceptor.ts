@@ -56,7 +56,6 @@
     console.log(`[CodeRelay Interceptor] Captured ${platform.toUpperCase()} Submission ID:`, submissionId, 'HasCode:', !!code);
     const detail = { platform, submissionId, code };
     window.dispatchEvent(new CustomEvent('codeRelaySubmission', { detail }));
-    document.dispatchEvent(new CustomEvent('codeRelaySubmission', { detail }));
   }
 
   window.addEventListener('codeRelayRequestCode', () => {
