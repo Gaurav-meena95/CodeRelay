@@ -17,5 +17,5 @@ export interface BaseAdapter {
   /**
    * Extracts and normalizes submission data into standard SubmissionPayload.
    */
-  processSubmission(submissionId: string | number): Promise<SubmissionResult | null>;
+  processSubmission(submissionId: string | number, capturedCode?: string | null): Promise<SubmissionResult | null>;
 }

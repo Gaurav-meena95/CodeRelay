@@ -63,18 +63,21 @@ export class CodeChefAdapter implements BaseAdapter {
   }
 
   /**
-   * Extracts source code from Monaco Editor, CodeMirror, or DOM lines on CodeChef.
+   * Extracts source code from DOM lines on CodeChef, filtering out autocomplete popups.
    */
   private getCodeFromDOM(): string | null {
-    // 1. Monaco Editor (standard in modern CodeChef IDE)
-    const monacoGlobal = (window as any).monaco;
-    if (monacoGlobal?.editor?.getModels) {
-      const models = monacoGlobal.editor.getModels();
-      if (models && models.length > 0) {
-        const val = models[0].getValue();
-        if (val && val.trim().length > 0) {
-          return val;
+    // 1. Monaco Editor (lines-content strictly inside .view-lines, excluding suggestions)
+    const monacoLines = document.querySelectorAll('.monaco-editor .lines-content .view-lines .view-line');
+    if (monacoLines && monacoLines.length > 0) {
+      const lines: string[] = [];
+      monacoLines.forEach(l => {
+        if (l.closest('.suggest-widget, .monaco-list, .parameter-hints-widget, .hover-widgets, .monaco-editor-hover')) {
+          return;
         }
+        lines.push(l.textContent || '');
+      });
+      if (lines.length > 0) {
+        return lines.join('\n');
       }
     }
 
@@ -88,26 +91,18 @@ export class CodeChefAdapter implements BaseAdapter {
     }
 
     // 3. Ace Editor
-    const aceGlobal = (window as any).ace;
-    if (aceGlobal && aceGlobal.edit) {
-      const aceElement = document.querySelector('.ace_editor');
-      if (aceElement) {
-        try {
-          const editor = aceGlobal.edit(aceElement);
-          const val = editor.getValue();
-          if (val && val.trim().length > 0) {
-            return val;
-          }
-        } catch {}
+    const aceLines = document.querySelectorAll('.ace_editor .ace_line');
+    if (aceLines && aceLines.length > 0) {
+      const lines: string[] = [];
+      aceLines.forEach(l => {
+        if (l.closest('.ace_autocomplete, .ace_tooltip')) {
+          return;
+        }
+        lines.push(l.textContent || '');
+      });
+      if (lines.length > 0) {
+        return lines.join('\n');
       }
-    }
-
-    // 4. Fallback DOM code lines
-    const lines = document.querySelectorAll('.view-line, .ace_line');
-    if (lines && lines.length > 0) {
-      const result: string[] = [];
-      lines.forEach(l => result.push(l.textContent || ''));
-      return result.join('\n');
     }
 
     return null;
@@ -158,14 +153,14 @@ export class CodeChefAdapter implements BaseAdapter {
   /**
    * Processes a CodeChef submission and packages the payload.
    */
-  async processSubmission(submissionId: string | number): Promise<SubmissionResult | null> {
+  async processSubmission(submissionId: string | number, capturedCode?: string | null): Promise<SubmissionResult | null> {
     console.log('[CodeRelay CodeChef] Processing submission ID:', submissionId);
 
     // 0.5s pause to ensure editor and result are settled
     await new Promise(r => setTimeout(r, 500));
 
     const meta = this.getProblemMeta();
-    const code = this.getCodeFromDOM();
+    const code = capturedCode?.trim() ? capturedCode : this.getCodeFromDOM();
 
     if (!code) {
       console.warn('[CodeRelay CodeChef] Could not extract source code');

@@ -172,7 +172,7 @@ ${markdownContent}
   /**
    * Polls LeetCode GraphQL until judging completes (up to 15 seconds).
    */
-  async processSubmission(submissionId: string | number): Promise<SubmissionResult | null> {
+  async processSubmission(submissionId: string | number, _capturedCode?: string | null): Promise<SubmissionResult | null> {
     const isCN = window.location.hostname.includes('leetcode.cn');
     const endpoint = isCN ? 'https://leetcode.cn/graphql/' : 'https://leetcode.com/graphql/';
     const subNum = Number(submissionId);

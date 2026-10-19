@@ -81,11 +81,18 @@ export class GfgAdapter implements BaseAdapter {
     }
 
     // 3. Fallback: DOM text contents in code lines
-    const codeLines = document.querySelectorAll('.ace_line, .view-line');
+    const codeLines = document.querySelectorAll('.ace_editor .ace_line, .monaco-editor .lines-content .view-lines .view-line');
     if (codeLines && codeLines.length > 0) {
       const lines: string[] = [];
-      codeLines.forEach(l => lines.push(l.textContent || ''));
-      return lines.join('\n');
+      codeLines.forEach(l => {
+        if (l.closest('.ace_autocomplete, .suggest-widget, .monaco-list, .parameter-hints-widget')) {
+          return;
+        }
+        lines.push(l.textContent || '');
+      });
+      if (lines.length > 0) {
+        return lines.join('\n');
+      }
     }
 
     return null;
@@ -124,14 +131,14 @@ export class GfgAdapter implements BaseAdapter {
   /**
    * Processes a GeeksforGeeks submission.
    */
-  async processSubmission(submissionId: string | number): Promise<SubmissionResult | null> {
+  async processSubmission(submissionId: string | number, capturedCode?: string | null): Promise<SubmissionResult | null> {
     console.log('[CodeRelay GFG] Processing submission with ID:', submissionId);
 
     // Give GFG results 0.5s to settle into the DOM
     await new Promise(r => setTimeout(r, 500));
 
     const meta = this.getProblemMeta();
-    const code = this.getCodeFromDOM();
+    const code = capturedCode?.trim() ? capturedCode : this.getCodeFromDOM();
 
     if (!code) {
       console.warn('[CodeRelay GFG] Could not extract source code from editor');

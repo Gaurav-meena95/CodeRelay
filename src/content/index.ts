@@ -13,14 +13,45 @@ const adapters: BaseAdapter[] = [
 let lastSubmissionId: string | number | null = null;
 
 /**
+ * Requests editor source code from the MAIN page context via CustomEvent bridge.
+ */
+async function queryMainWorldCode(): Promise<string | null> {
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      cleanup();
+      resolve(null);
+    }, 250);
+
+    function handler(e: Event) {
+      const detail = (e as CustomEvent).detail;
+      cleanup();
+      resolve(detail?.code || null);
+    }
+
+    function cleanup() {
+      clearTimeout(timeout);
+      window.removeEventListener('codeRelayCodeResponse', handler);
+    }
+
+    window.addEventListener('codeRelayCodeResponse', handler);
+    window.dispatchEvent(new CustomEvent('codeRelayRequestCode'));
+  });
+}
+
+/**
  * Handles submission processing and sends payload to background service worker.
  */
-async function handleSubmission(adapter: BaseAdapter, submissionId: string | number) {
+async function handleSubmission(adapter: BaseAdapter, submissionId: string | number, capturedCode?: string | null) {
   console.log(`[CodeRelay Content] Handling ${adapter.platform.toUpperCase()} submission ID:`, submissionId);
   LeetCodeUI.setState('loading', 'Pushing...');
 
   try {
-    const result = await adapter.processSubmission(submissionId);
+    let finalCode = capturedCode;
+    if (!finalCode) {
+      finalCode = await queryMainWorldCode();
+    }
+
+    const result = await adapter.processSubmission(submissionId, finalCode);
 
     if (!result) {
       console.warn('[CodeRelay Content] Could not retrieve submission result');
@@ -90,18 +121,18 @@ function initContentScript() {
 
   // Common event handler for submission events
   const onSubmissionEvent = (event: Event) => {
-    const customEvent = event as CustomEvent<{ platform: string; submissionId: string | number }>;
-    const { platform, submissionId } = customEvent.detail || {};
+    const customEvent = event as CustomEvent<{ platform: string; submissionId: string | number; code?: string | null }>;
+    const { platform, submissionId, code } = customEvent.detail || {};
 
     if (!submissionId) {
       return;
     }
 
-    console.log('[CodeRelay] Caught submission event:', platform, submissionId);
+    console.log('[CodeRelay] Caught submission event:', platform, submissionId, 'HasCode:', !!code);
     lastSubmissionId = submissionId;
 
     const targetAdapter = adapters.find(a => a.platform === platform) || activeAdapter;
-    handleSubmission(targetAdapter, submissionId);
+    handleSubmission(targetAdapter, submissionId, code);
   };
 
   // DOM observer fallback for GFG and CodeChef success banners

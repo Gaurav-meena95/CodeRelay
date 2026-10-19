@@ -4,12 +4,65 @@
 (function initCodeRelayInterceptor() {
   const originalFetch = window.fetch;
 
+  function getEditorCode(): string | null {
+    try {
+      // 1. Monaco Editor (CodeChef, LeetCode)
+      const monaco = (window as any).monaco;
+      if (monaco?.editor) {
+        if (typeof monaco.editor.getEditors === 'function') {
+          const editors = monaco.editor.getEditors();
+          for (const ed of editors) {
+            const val = ed.getValue?.();
+            if (val && val.trim().length > 0) return val;
+          }
+        }
+        if (typeof monaco.editor.getModels === 'function') {
+          const models = monaco.editor.getModels();
+          for (const m of models) {
+            const val = m.getValue?.();
+            const uri = m.uri?.toString() || '';
+            if (val && val.trim().length > 0 && !uri.includes('schema') && !uri.includes('internal')) {
+              return val;
+            }
+          }
+        }
+      }
+
+      // 2. Ace Editor (GFG)
+      const ace = (window as any).ace;
+      if (ace?.edit) {
+        const aceElement = document.querySelector('.ace_editor');
+        if (aceElement) {
+          const ed = ace.edit(aceElement);
+          const val = ed.getValue?.();
+          if (val && val.trim().length > 0) return val;
+        }
+      }
+
+      // 3. CodeMirror
+      const cmEl = document.querySelector('.CodeMirror') as any;
+      if (cmEl?.CodeMirror?.getValue) {
+        const val = cmEl.CodeMirror.getValue();
+        if (val && val.trim().length > 0) return val;
+      }
+    } catch (err) {
+      console.warn('[CodeRelay Interceptor] Error capturing page editor code:', err);
+    }
+    return null;
+  }
+
   function dispatchSubmission(submissionId: string | number, platform = 'leetcode') {
-    console.log(`[CodeRelay Interceptor] Captured ${platform.toUpperCase()} Submission ID:`, submissionId);
-    const detail = { platform, submissionId };
+    const code = getEditorCode();
+    console.log(`[CodeRelay Interceptor] Captured ${platform.toUpperCase()} Submission ID:`, submissionId, 'HasCode:', !!code);
+    const detail = { platform, submissionId, code };
     window.dispatchEvent(new CustomEvent('codeRelaySubmission', { detail }));
     document.dispatchEvent(new CustomEvent('codeRelaySubmission', { detail }));
   }
+
+  window.addEventListener('codeRelayRequestCode', () => {
+    const code = getEditorCode();
+    window.dispatchEvent(new CustomEvent('codeRelayCodeResponse', { detail: { code } }));
+  });
 
   window.fetch = async function (...args) {
     const [resource, options] = args;
