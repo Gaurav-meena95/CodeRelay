@@ -83,10 +83,10 @@ export class LeetCodeUI {
       return;
     }
 
-    // Priority 2: GFG / CodeChef Submit or Run Button
-    const allButtons = Array.from(document.querySelectorAll('button'));
+    // Priority 2: GFG / CodeChef / Codeforces Submit or Run Button
+    const allButtons = Array.from(document.querySelectorAll('button, input[type="submit"], input.submit'));
     const actionBtn = allButtons.find(b => {
-      const txt = (b.textContent || '').trim().toLowerCase();
+      const txt = (b.textContent || (b as HTMLInputElement).value || '').trim().toLowerCase();
       return txt === 'submit' || txt === 'compile & run' || txt === 'compile' || txt === 'run';
     });
     if (actionBtn && actionBtn.parentElement) {
@@ -95,8 +95,10 @@ export class LeetCodeUI {
       return;
     }
 
-    // Priority 2b: GFG / CodeChef Compiler Bar / IDE Header Container
-    const actionToolbar = document.querySelector('[class*="compiler_actions"], [class*="compile_run"], .compiler-button-wrapper, [class*="problem-tab__actions"], [class*="ide-header"], [class*="editor-actions"], .problems_header_content__title');
+    // Priority 2b: GFG / CodeChef Compiler Bar / IDE Header / Codeforces Header
+    const actionToolbar = document.querySelector(
+      '[class*="compiler_actions"], [class*="compile_run"], .compiler-button-wrapper, [class*="problem-tab__actions"], [class*="ide-header"], [class*="editor-actions"], .problems_header_content__title, .problem-statement .header .title'
+    );
     if (actionToolbar) {
       const btn = this.createButtonElement(onClick);
       actionToolbar.appendChild(btn);

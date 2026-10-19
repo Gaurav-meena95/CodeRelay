@@ -45,6 +45,16 @@
         const val = cmEl.CodeMirror.getValue();
         if (val && val.trim().length > 0) return val;
       }
+
+      // 4. Codeforces textarea or submission pre element
+      const textarea = document.querySelector('textarea#sourceCodeText, textarea[name="source"]') as HTMLTextAreaElement;
+      if (textarea && textarea.value?.trim()) {
+        return textarea.value.trim();
+      }
+      const preSource = document.querySelector('#program-source-text, .program-source, pre.prettyprint');
+      if (preSource && preSource.textContent?.trim()) {
+        return preSource.textContent.trim();
+      }
     } catch (err) {
       console.warn('[CodeRelay Interceptor] Error capturing page editor code:', err);
     }
@@ -120,6 +130,11 @@
       } catch {}
     }
 
+    // 5. Codeforces Submissions
+    if (url.includes('codeforces.com') && (url.includes('/submit') || url.includes('/data/submitSource'))) {
+      dispatchSubmission(Date.now(), 'codeforces');
+    }
+
     return response;
   };
 
@@ -161,6 +176,10 @@
             dispatchSubmission(data?.submission_id || Date.now(), 'codechef');
           }
         } catch {}
+      }
+
+      if (url.includes('codeforces.com') && (url.includes('/submit') || url.includes('/data/submitSource'))) {
+        dispatchSubmission(Date.now(), 'codeforces');
       }
     });
 

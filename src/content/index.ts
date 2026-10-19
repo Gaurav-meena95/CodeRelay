@@ -1,13 +1,15 @@
 import { LeetCodeAdapter } from '../adapters/leetcode';
 import { GfgAdapter } from '../adapters/gfg';
 import { CodeChefAdapter } from '../adapters/codechef';
+import { CodeforcesAdapter } from '../adapters/codeforces';
 import { LeetCodeUI } from '../adapters/leetcode-ui';
 import { BaseAdapter } from '../adapters/base-adapter';
 
 const adapters: BaseAdapter[] = [
   new LeetCodeAdapter(),
   new GfgAdapter(),
-  new CodeChefAdapter()
+  new CodeChefAdapter(),
+  new CodeforcesAdapter()
 ];
 
 let lastSubmissionId: string | number | null = null;
@@ -173,12 +175,14 @@ function initContentScript() {
     handleSubmission(targetAdapter, submissionId, code);
   };
 
-  // DOM observer fallback for GFG and CodeChef success banners
-  if (activeAdapter.platform === 'gfg' || activeAdapter.platform === 'codechef') {
+  // DOM observer fallback for GFG, CodeChef, and Codeforces success banners
+  if (activeAdapter.platform === 'gfg' || activeAdapter.platform === 'codechef' || activeAdapter.platform === 'codeforces') {
     let alreadySynced = false;
     const observer = new MutationObserver(() => {
+      const hasCfAccepted = !!document.querySelector('.verdict-accepted, [class*="verdict-accepted"]');
       const text = document.body?.innerText || '';
-      const isSuccess = text.includes('Problem Solved Successfully') ||
+      const isSuccess = hasCfAccepted ||
+                        text.includes('Problem Solved Successfully') ||
                         text.includes('Correct Answer') ||
                         text.includes('100 pts');
 
