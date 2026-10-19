@@ -83,11 +83,23 @@ export class LeetCodeUI {
       return;
     }
 
-    // Priority 2: GeeksforGeeks Compiler Bar / Run Button
-    const gfgRunBtn = document.querySelector('button[class*="run-button"], .compiler-button-wrapper, [class*="compiler_actions"]');
-    if (gfgRunBtn && gfgRunBtn.parentElement) {
+    // Priority 2: GeeksforGeeks Submit or Compile Button
+    const allButtons = Array.from(document.querySelectorAll('button'));
+    const gfgActionBtn = allButtons.find(b => {
+      const txt = (b.textContent || '').trim().toLowerCase();
+      return txt === 'submit' || txt === 'compile & run' || txt === 'compile';
+    });
+    if (gfgActionBtn && gfgActionBtn.parentElement) {
       const btn = this.createButtonElement(onClick);
-      gfgRunBtn.parentElement.prepend(btn);
+      gfgActionBtn.parentElement.insertBefore(btn, gfgActionBtn);
+      return;
+    }
+
+    // Priority 2b: GeeksforGeeks Compiler Bar / Toolbar Container
+    const gfgBar = document.querySelector('[class*="compiler_actions"], [class*="compile_run"], .compiler-button-wrapper, [class*="problem-tab__actions"], .problems_header_content__title');
+    if (gfgBar) {
+      const btn = this.createButtonElement(onClick);
+      gfgBar.appendChild(btn);
       return;
     }
 

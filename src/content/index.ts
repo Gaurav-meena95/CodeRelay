@@ -102,6 +102,25 @@ function initContentScript() {
     handleSubmission(targetAdapter, submissionId);
   };
 
+  // DOM observer fallback for GFG success banner
+  if (activeAdapter.platform === 'gfg') {
+    let alreadySynced = false;
+    const observer = new MutationObserver(() => {
+      const text = document.body?.innerText || '';
+      if (text.includes('Problem Solved Successfully') || text.includes('Correct Answer')) {
+        if (!alreadySynced) {
+          alreadySynced = true;
+          console.log('[CodeRelay GFG] Detected Problem Solved Successfully banner in DOM!');
+          handleSubmission(activeAdapter, Date.now());
+          setTimeout(() => {
+            alreadySynced = false;
+          }, 12000);
+        }
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
+
   window.addEventListener('codeRelaySubmission', onSubmissionEvent);
   document.addEventListener('codeRelaySubmission', onSubmissionEvent);
 }
