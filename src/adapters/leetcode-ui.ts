@@ -21,9 +21,11 @@ export class LeetCodeUI {
         display: inline-flex !important;
         align-items: center !important;
         justify-content: center !important;
-        gap: 6px !important;
+        align-self: center !important;
+        gap: 5px !important;
         height: 32px !important;
-        padding: 0 12px !important;
+        max-height: 32px !important;
+        padding: 0 10px !important;
         font-size: 13px !important;
         font-weight: 500 !important;
         font-family: inherit !important;
@@ -33,8 +35,8 @@ export class LeetCodeUI {
         background: rgba(255, 255, 255, 0.08) !important;
         color: #eff1f6 !important;
         border: 1px solid rgba(255, 255, 255, 0.16) !important;
-        margin-left: 8px !important;
-        margin-right: 0 !important;
+        margin-left: 6px !important;
+        margin-right: 6px !important;
         z-index: 10 !important;
         line-height: 1 !important;
         box-sizing: border-box !important;
@@ -65,9 +67,23 @@ export class LeetCodeUI {
         color: #38bdf8 !important;
         background: rgba(56, 189, 248, 0.12) !important;
       }
+      #coderelay-icon {
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        font-size: 13px !important;
+        line-height: 1 !important;
+      }
+      #coderelay-text {
+        display: inline-flex !important;
+        align-items: center !important;
+        font-size: 13px !important;
+        font-weight: 500 !important;
+        line-height: 1 !important;
+      }
       .${this.SPINNER_ID} {
-        width: 14px !important;
-        height: 14px !important;
+        width: 13px !important;
+        height: 13px !important;
         border: 2px solid transparent !important;
         border-top-color: currentColor !important;
         border-radius: 50% !important;
@@ -91,13 +107,27 @@ export class LeetCodeUI {
 
     this.injectStyles();
 
-    // Priority 1: LeetCode Submit Button -> inject directly AFTER Submit button to preserve Run/Submit pairing
+    // Priority 1: LeetCode Toolbar -> place BEFORE Run button (Push -> Run -> Submit)
+    const leetCodeRun = document.querySelector(
+      '[data-e2e-locator="console-run-button"], button[data-cy="run-code-btn"]'
+    );
+    if (leetCodeRun && leetCodeRun.parentElement) {
+      const btn = this.createButtonElement(onClick);
+      leetCodeRun.parentElement.insertBefore(btn, leetCodeRun);
+      return;
+    }
+
     const leetCodeSubmit = document.querySelector(
       '[data-e2e-locator="console-submit-button"], button[data-cy="submit-code-btn"]'
     );
-    if (leetCodeSubmit) {
+    if (leetCodeSubmit && leetCodeSubmit.parentElement) {
+      const prevBtn = leetCodeSubmit.previousElementSibling;
       const btn = this.createButtonElement(onClick);
-      leetCodeSubmit.insertAdjacentElement('afterend', btn);
+      if (prevBtn && prevBtn.parentElement) {
+        prevBtn.parentElement.insertBefore(btn, prevBtn);
+      } else {
+        leetCodeSubmit.parentElement.insertBefore(btn, leetCodeSubmit);
+      }
       return;
     }
 
@@ -109,8 +139,7 @@ export class LeetCodeUI {
     });
     if (actionBtn && actionBtn.parentElement) {
       const btn = this.createButtonElement(onClick);
-      // Place after action button so Run & Submit remain visually grouped
-      actionBtn.insertAdjacentElement('afterend', btn);
+      actionBtn.parentElement.insertBefore(btn, actionBtn);
       return;
     }
 
