@@ -311,24 +311,24 @@ ${markdownContent}
       }
     }
 
-    // Determine verdict
+    // Determine verdict from check API, GraphQL, or page DOM
     const statusMsg = checkResult?.status_msg || gqlDetails?.statusDisplay || (checkResult?.status_code === 10 || gqlDetails?.statusCode === 10 ? 'Accepted' : null);
-    const isAccepted = statusMsg === 'Accepted' || checkResult?.status_code === 10 || gqlDetails?.statusCode === 10;
+    const lcResultEl = document.querySelector('[data-e2e-locator="submission-result"]');
+    const hasDomAccepted = !!lcResultEl && (lcResultEl.textContent?.includes('Accepted') || false);
+    const isAccepted = statusMsg === 'Accepted' || checkResult?.status_code === 10 || gqlDetails?.statusCode === 10 || hasDomAccepted;
 
-    // If it was an intercepted submission and explicitly rejected (e.g. Wrong Answer, Compile Error):
-    if (isRealSubId && !isAccepted && (checkResult || gqlDetails)) {
-      const display = statusMsg || STATUS_MAP[checkResult?.status_code || gqlDetails?.statusCode] || 'Wrong Answer';
-      console.log('[CodeRelay LeetCode] Submission not accepted:', display);
+    // Strict Rule: ONLY push if submission is explicitly ACCEPTED. Block everything else.
+    if (!isAccepted) {
+      const display = statusMsg || (checkResult?.status_code ? STATUS_MAP[checkResult.status_code] : null) || (gqlDetails?.statusCode ? STATUS_MAP[gqlDetails.statusCode] : null) || 'Not Accepted';
+      console.log('[CodeRelay LeetCode] Submission is NOT accepted (Verdict: ' + display + '). Push blocked.');
       return {
         accepted: false,
         statusDisplay: display
       };
     }
 
-    // Short buffer for accepted auto-sync
-    if (isAccepted) {
-      await new Promise(r => setTimeout(r, 500));
-    }
+    // Buffer for accepted auto-sync
+    await new Promise(r => setTimeout(r, 500));
 
     // Retrieve question data (from GraphQL details or public question API)
     let questionData = gqlDetails?.question || (slug ? await this.fetchProblemBySlug(slug) : null);

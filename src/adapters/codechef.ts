@@ -176,6 +176,17 @@ export class CodeChefAdapter implements BaseAdapter {
     // 0.5s pause to ensure editor and result are settled
     await new Promise(r => setTimeout(r, 500));
 
+    // Strict Rule: ONLY push if CodeChef verdict is confirmed Accepted ("100 pts" or "Correct Answer")
+    const pageText = document.body?.innerText || '';
+    const isAccepted = pageText.includes('100 pts') || pageText.includes('Correct Answer') || !!document.querySelector('.verdict-accepted, [class*="verdict-accepted"], .tick');
+    if (!isAccepted) {
+      console.log('[CodeRelay CodeChef] Submission is NOT accepted yet. Push blocked.');
+      return {
+        accepted: false,
+        statusDisplay: 'Not Accepted'
+      };
+    }
+
     const meta = this.getProblemMeta();
     let title = meta.title;
     let contentHtml = meta.contentHtml;

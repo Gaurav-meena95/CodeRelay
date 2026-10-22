@@ -179,6 +179,17 @@ export class GfgAdapter implements BaseAdapter {
     // Give GFG results 0.5s to settle into the DOM
     await new Promise(r => setTimeout(r, 500));
 
+    // Strict Rule: ONLY push if GFG verdict is confirmed Accepted ("Problem Solved Successfully" or "Correct Answer")
+    const pageText = document.body?.innerText || '';
+    const isAccepted = pageText.includes('Problem Solved Successfully') || pageText.includes('Correct Answer');
+    if (!isAccepted) {
+      console.log('[CodeRelay GFG] Submission is NOT accepted yet. Push blocked.');
+      return {
+        accepted: false,
+        statusDisplay: 'Not Accepted'
+      };
+    }
+
     // Extract slug from URL: /problems/palindrome-string0817/1
     const match = window.location.pathname.match(/\/problems\/([^/]+)/);
     const problemSlug = match ? match[1] : 'problem';

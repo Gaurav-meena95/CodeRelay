@@ -224,6 +224,17 @@ export class CodeforcesAdapter implements BaseAdapter {
     // Give DOM 0.5s to settle
     await new Promise(r => setTimeout(r, 500));
 
+    // Strict Rule: ONLY push if Codeforces verdict is confirmed Accepted
+    const pageText = document.body?.innerText || '';
+    const hasAccepted = !!document.querySelector('.verdict-accepted, [class*="verdict-accepted"]') || pageText.includes('Accepted');
+    if (!hasAccepted) {
+      console.log('[CodeRelay Codeforces] Submission is NOT accepted yet. Push blocked.');
+      return {
+        accepted: false,
+        statusDisplay: 'Not Accepted'
+      };
+    }
+
     const meta = this.getProblemMeta();
     const code = capturedCode?.trim() ? capturedCode : this.getCodeFromDOM();
 
