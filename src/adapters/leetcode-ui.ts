@@ -20,40 +20,56 @@ export class LeetCodeUI {
       #${this.BUTTON_ID} {
         display: inline-flex !important;
         align-items: center !important;
+        justify-content: center !important;
         gap: 6px !important;
-        padding: 4px 10px !important;
-        font-size: 12px !important;
-        font-weight: 600 !important;
+        height: 32px !important;
+        padding: 0 12px !important;
+        font-size: 13px !important;
+        font-weight: 500 !important;
+        font-family: inherit !important;
         border-radius: 6px !important;
         cursor: pointer !important;
-        transition: all 0.2s ease !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
         background: rgba(255, 255, 255, 0.08) !important;
         color: #eff1f6 !important;
         border: 1px solid rgba(255, 255, 255, 0.16) !important;
-        margin-right: 8px !important;
         margin-left: 8px !important;
+        margin-right: 0 !important;
         z-index: 10 !important;
-        line-height: 1.2 !important;
+        line-height: 1 !important;
+        box-sizing: border-box !important;
+        user-select: none !important;
+        vertical-align: middle !important;
+        white-space: nowrap !important;
       }
       #${this.BUTTON_ID}:hover {
-        background: rgba(255, 255, 255, 0.18) !important;
-        border-color: rgba(255, 255, 255, 0.3) !important;
+        background: rgba(255, 255, 255, 0.16) !important;
+        border-color: rgba(255, 255, 255, 0.28) !important;
+        color: #ffffff !important;
+      }
+      #${this.BUTTON_ID}:active {
+        transform: scale(0.97) !important;
       }
       #${this.BUTTON_ID}.coderelay-success {
-        border-color: #10b981 !important;
+        border-color: rgba(16, 185, 129, 0.4) !important;
         color: #10b981 !important;
-        background: rgba(16, 185, 129, 0.16) !important;
+        background: rgba(16, 185, 129, 0.12) !important;
       }
       #${this.BUTTON_ID}.coderelay-error {
-        border-color: #ef4444 !important;
+        border-color: rgba(239, 68, 68, 0.4) !important;
         color: #ef4444 !important;
-        background: rgba(239, 68, 68, 0.16) !important;
+        background: rgba(239, 68, 68, 0.12) !important;
+      }
+      #${this.BUTTON_ID}.coderelay-loading {
+        border-color: rgba(56, 189, 248, 0.4) !important;
+        color: #38bdf8 !important;
+        background: rgba(56, 189, 248, 0.12) !important;
       }
       .${this.SPINNER_ID} {
-        width: 12px !important;
-        height: 12px !important;
+        width: 14px !important;
+        height: 14px !important;
         border: 2px solid transparent !important;
-        border-top-color: #38bdf8 !important;
+        border-top-color: currentColor !important;
         border-radius: 50% !important;
         animation: coderelay-spin 0.8s linear infinite !important;
         display: inline-block !important;
@@ -66,7 +82,7 @@ export class LeetCodeUI {
   }
 
   /**
-   * Injects the Push button into LeetCode's code editor toolbar.
+   * Injects the Push button into LeetCode or other platform code editor toolbar.
    */
   static injectButton(onClick: () => void) {
     if (document.getElementById(this.BUTTON_ID)) {
@@ -75,11 +91,13 @@ export class LeetCodeUI {
 
     this.injectStyles();
 
-    // Priority 1: Toolbar right-side actions (.ml-auto or buttons container)
-    const rightActions = document.querySelector('.ml-auto, [class*="ml-auto"]');
-    if (rightActions) {
+    // Priority 1: LeetCode Submit Button -> inject directly AFTER Submit button to preserve Run/Submit pairing
+    const leetCodeSubmit = document.querySelector(
+      '[data-e2e-locator="console-submit-button"], button[data-cy="submit-code-btn"]'
+    );
+    if (leetCodeSubmit) {
       const btn = this.createButtonElement(onClick);
-      rightActions.prepend(btn);
+      leetCodeSubmit.insertAdjacentElement('afterend', btn);
       return;
     }
 
@@ -91,11 +109,12 @@ export class LeetCodeUI {
     });
     if (actionBtn && actionBtn.parentElement) {
       const btn = this.createButtonElement(onClick);
-      actionBtn.parentElement.insertBefore(btn, actionBtn);
+      // Place after action button so Run & Submit remain visually grouped
+      actionBtn.insertAdjacentElement('afterend', btn);
       return;
     }
 
-    // Priority 2b: GFG / CodeChef Compiler Bar / IDE Header / Codeforces Header
+    // Priority 3: GFG / CodeChef Compiler Bar / IDE Header / Codeforces Header
     const actionToolbar = document.querySelector(
       '[class*="compiler_actions"], [class*="compile_run"], .compiler-button-wrapper, [class*="problem-tab__actions"], [class*="ide-header"], [class*="editor-actions"], .problems_header_content__title, .problem-statement .header .title'
     );
@@ -105,29 +124,30 @@ export class LeetCodeUI {
       return;
     }
 
-    // Priority 3: Next to language picker (LeetCode or GFG)
+    // Priority 4: Toolbar right-side actions (.ml-auto or buttons container)
+    const rightActions = document.querySelector('.ml-auto, [class*="ml-auto"]');
+    if (rightActions) {
+      const btn = this.createButtonElement(onClick);
+      rightActions.prepend(btn);
+      return;
+    }
+
+    // Priority 5: Next to language picker (LeetCode or GFG)
     const langPicker = document.querySelector('button[id^="headlessui-listbox-button"], .select-language, [class*="language-select"]');
     if (langPicker && langPicker.parentElement) {
       const btn = this.createButtonElement(onClick);
       langPicker.parentElement.appendChild(btn);
       return;
     }
-
-    // Priority 4: Note button or settings icon
-    const noteBtn = document.querySelector('button[aria-label="Save note"]') || document.querySelector('button[aria-label="Shortcuts"]');
-    if (noteBtn && noteBtn.parentElement) {
-      const btn = this.createButtonElement(onClick);
-      noteBtn.parentElement.prepend(btn);
-      return;
-    }
   }
 
   private static createButtonElement(onClick: () => void): HTMLElement {
     const btn = document.createElement('button');
+    btn.type = 'button';
     btn.id = this.BUTTON_ID;
     btn.title = 'CodeRelay: Click to push solution to GitHub';
     btn.innerHTML = `
-      <span id="coderelay-icon">⚡</span>
+      <span id="coderelay-icon" style="display:inline-flex;align-items:center;">⚡</span>
       <span id="coderelay-text">Push</span>
     `;
 

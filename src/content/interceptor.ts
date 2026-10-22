@@ -9,21 +9,32 @@
       // 1. Monaco Editor (CodeChef, LeetCode)
       const monaco = (window as any).monaco;
       if (monaco?.editor) {
+        if (typeof monaco.editor.getModels === 'function') {
+          const models = monaco.editor.getModels();
+          let bestVal: string | null = null;
+          let maxLen = 0;
+          for (const m of models) {
+            const val = m.getValue?.();
+            const uri = m.uri?.toString() || '';
+            const lang = (m as any).getLanguageId?.() || '';
+            if (!val || uri.includes('schema') || uri.includes('internal') || lang === 'json') continue;
+            // Prefer programming language models over plaintext / testcases
+            if (lang && lang !== 'plaintext' && val.trim().length > 0) {
+              bestVal = val;
+              break;
+            }
+            if (val.trim().length > maxLen) {
+              maxLen = val.trim().length;
+              bestVal = val;
+            }
+          }
+          if (bestVal && bestVal.trim().length > 0) return bestVal;
+        }
         if (typeof monaco.editor.getEditors === 'function') {
           const editors = monaco.editor.getEditors();
           for (const ed of editors) {
             const val = ed.getValue?.();
             if (val && val.trim().length > 0) return val;
-          }
-        }
-        if (typeof monaco.editor.getModels === 'function') {
-          const models = monaco.editor.getModels();
-          for (const m of models) {
-            const val = m.getValue?.();
-            const uri = m.uri?.toString() || '';
-            if (val && val.trim().length > 0 && !uri.includes('schema') && !uri.includes('internal')) {
-              return val;
-            }
           }
         }
       }

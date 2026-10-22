@@ -34,8 +34,10 @@ const STATUS_MAP: Record<number, string> = {
   12: 'Memory Limit',
   13: 'Output Limit',
   14: 'Time Limit',
-  15: 'Runtime Error',
-  16: 'Compile Error'
+  15: 'Memory Limit',
+  16: 'Compile Error',
+  20: 'Compile Error',
+  21: 'Runtime Error'
 };
 
 export class LeetCodeAdapter implements BaseAdapter {
@@ -46,6 +48,40 @@ export class LeetCodeAdapter implements BaseAdapter {
    */
   canHandle(url: string): boolean {
     return url.includes('leetcode.com') || url.includes('leetcode.cn');
+  }
+
+  /**
+   * Extracts csrf token from document.cookie for authenticated GraphQL requests.
+   */
+  private getCsrfToken(): string | null {
+    const match = document.cookie.match(/csrftoken=([^;]+)/);
+    return match ? match[1] : null;
+  }
+
+  /**
+   * Extracts the problem slug from URL pathname (/problems/{slug}/...).
+   */
+  private getProblemSlug(): string {
+    const match = window.location.pathname.match(/\/problems\/([^/]+)/);
+    return match ? match[1] : '';
+  }
+
+  /**
+   * Reads selected programming language and extension from editor toolbar DOM.
+   */
+  private getSelectedLanguage(): { name: string; ext: string } {
+    const langBtn = document.querySelector(
+      'button[id^="headlessui-listbox-button"], [data-cy="lang-select"], [class*="select-language"]'
+    );
+    const text = (langBtn?.textContent || '').trim();
+    const lower = text.toLowerCase();
+
+    for (const [key, ext] of Object.entries(LANGUAGE_EXTENSIONS)) {
+      if (lower === key || lower.startsWith(key) || lower.includes(key)) {
+        return { name: text || key, ext };
+      }
+    }
+    return { name: text || 'Python3', ext: 'py' };
   }
 
   /**
@@ -96,7 +132,7 @@ export class LeetCodeAdapter implements BaseAdapter {
     const tagBadges = tags.map(t => `\`${t}\``).join(' ');
     const markdownContent = this.htmlToMarkdown(contentHtml);
 
-    return `# [${problemFrontendId}. ${title}](${problemUrl})
+    return `# [${problemFrontendId ? `${problemFrontendId}. ` : ''}${title}](${problemUrl})
 
 ![Difficulty: ${difficulty}](https://img.shields.io/badge/Difficulty-${difficulty}-${difficultyColor})
 
@@ -111,9 +147,48 @@ ${markdownContent}
   }
 
   /**
-   * Fetches submission details from LeetCode GraphQL with cookie session.
+   * Polls LeetCode native judging check endpoint (/submissions/detail/{id}/check/).
    */
-  private async fetchDetails(endpoint: string, submissionId: number): Promise<any> {
+  private async pollCheckEndpoint(submissionId: number | string): Promise<any> {
+    const isCN = window.location.hostname.includes('leetcode.cn');
+    const baseUrl = isCN ? 'https://leetcode.cn' : 'https://leetcode.com';
+    const checkUrl = `${baseUrl}/submissions/detail/${submissionId}/check/`;
+
+    for (let attempt = 1; attempt <= 15; attempt++) {
+      try {
+        const response = await fetch(checkUrl, {
+          method: 'GET',
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`[CodeRelay LeetCode] Poll attempt ${attempt} state:`, data?.state, data?.status_msg);
+
+          if (data?.state === 'SUCCESS') {
+            return data;
+          }
+        }
+      } catch (err) {
+        console.warn(`[CodeRelay LeetCode] Check poll attempt ${attempt} failed:`, err);
+      }
+
+      await new Promise(r => setTimeout(r, 1000));
+    }
+    return null;
+  }
+
+  /**
+   * Fetches submission details from LeetCode GraphQL with csrf verification.
+   */
+  private async fetchDetailsGraphQL(submissionId: number | string): Promise<any> {
+    const isCN = window.location.hostname.includes('leetcode.cn');
+    const endpoint = isCN ? 'https://leetcode.cn/graphql/' : 'https://leetcode.com/graphql/';
+    const subNum = Number(submissionId);
+    if (isNaN(subNum) || subNum <= 0 || subNum > 2147483647) {
+      return null;
+    }
+
     const query = `
       query submissionDetails($submissionId: Int!) {
         submissionDetails(submissionId: $submissionId) {
@@ -122,6 +197,7 @@ ${markdownContent}
           code
           timestamp
           statusCode
+          statusDisplay
           lang {
             name
             verboseName
@@ -142,117 +218,165 @@ ${markdownContent}
       }
     `;
 
-    const isCN = window.location.hostname.includes('leetcode.cn');
     const headers: Record<string, string> = {
       'Content-Type': 'application/json'
     };
-    if (document.cookie) {
-      headers['cookie'] = document.cookie;
+    const csrf = this.getCsrfToken();
+    if (csrf) {
+      headers['x-csrftoken'] = csrf;
     }
 
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      credentials: 'include',
-      headers,
-      body: JSON.stringify({
-        query,
-        variables: { submissionId: isCN ? submissionId.toString() : Number(submissionId) },
-        operationName: 'submissionDetails'
-      })
-    });
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        credentials: 'include',
+        headers,
+        body: JSON.stringify({
+          query,
+          variables: { submissionId: isCN ? submissionId.toString() : subNum },
+          operationName: 'submissionDetails'
+        })
+      });
 
-    if (!response.ok) {
-      throw new Error(`LeetCode GraphQL call failed: ${response.status}`);
+      if (!response.ok) return null;
+      const json = await response.json();
+      return json?.data?.submissionDetails || json?.data?.submissionDetail || null;
+    } catch {
+      return null;
     }
-
-    const json = await response.json();
-    return json?.data?.submissionDetails || json?.data?.submissionDetail || null;
   }
 
   /**
-   * Polls LeetCode GraphQL until judging completes (up to 15 seconds).
+   * Fetches public problem statement, difficulty, and tags without requiring auth or csrf.
    */
-  async processSubmission(submissionId: string | number, _capturedCode?: string | null): Promise<SubmissionResult | null> {
+  private async fetchProblemBySlug(titleSlug: string): Promise<any> {
     const isCN = window.location.hostname.includes('leetcode.cn');
     const endpoint = isCN ? 'https://leetcode.cn/graphql/' : 'https://leetcode.com/graphql/';
-    const subNum = Number(submissionId);
 
-    console.log('[CodeRelay] Polling submission details for ID:', subNum);
-
-    // Initial wait to let LeetCode test cases start evaluating
-    await new Promise(r => setTimeout(r, 1500));
-
-    let details: any = null;
-    const maxPollAttempts = 15;
-
-    for (let attempt = 1; attempt <= maxPollAttempts; attempt++) {
-      try {
-        details = await this.fetchDetails(endpoint, subNum);
-
-        // Check if judging finished (statusCode exists and is not null/0/pending)
-        if (details && details.statusCode !== null && details.statusCode !== undefined && details.statusCode !== 0) {
-          console.log('[CodeRelay] Submission judging completed on attempt', attempt, 'Status:', details.statusCode);
-          break;
+    const query = `
+      query questionData($titleSlug: String!) {
+        question(titleSlug: $titleSlug) {
+          questionId
+          questionFrontendId
+          title
+          titleSlug
+          content
+          difficulty
+          topicTags {
+            name
+            slug
+          }
         }
-      } catch (err) {
-        console.warn(`[CodeRelay] Attempt ${attempt} fetch failed:`, err);
       }
+    `;
 
-      // Wait 1 second before checking again
-      await new Promise(r => setTimeout(r, 1000));
-    }
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query,
+          variables: { titleSlug },
+          operationName: 'questionData'
+        })
+      });
 
-    if (!details) {
-      console.error('[CodeRelay] Submission details could not be retrieved');
+      if (!response.ok) return null;
+      const json = await response.json();
+      return json?.data?.question || null;
+    } catch {
       return null;
     }
+  }
 
-    const isAccepted = details.statusCode === 10;
-    const statusText = STATUS_MAP[details.statusCode] || (isAccepted ? 'Accepted' : 'Failed');
+  /**
+   * Processes submission result and compiles payload for GitHub sync.
+   */
+  async processSubmission(submissionId: string | number, capturedCode?: string | null): Promise<SubmissionResult | null> {
+    const subNum = Number(submissionId);
+    const slug = this.getProblemSlug();
+    const isRealSubId = !isNaN(subNum) && subNum > 0 && subNum < 2000000000;
 
-    if (isAccepted) {
-      // 0.5 sec delay as requested once submission is successfully accepted
-      await new Promise(r => setTimeout(r, 500));
+    let checkResult: any = null;
+    let gqlDetails: any = null;
+
+    if (isRealSubId) {
+      console.log('[CodeRelay LeetCode] Polling check endpoint for submission ID:', subNum);
+      checkResult = await this.pollCheckEndpoint(subNum);
+
+      if (!checkResult) {
+        // Fallback to GraphQL
+        gqlDetails = await this.fetchDetailsGraphQL(subNum);
+      }
     }
 
-    if (!isAccepted) {
-      console.log('[CodeRelay] Submission rejected:', statusText);
+    // Determine verdict
+    const statusMsg = checkResult?.status_msg || gqlDetails?.statusDisplay || (checkResult?.status_code === 10 || gqlDetails?.statusCode === 10 ? 'Accepted' : null);
+    const isAccepted = statusMsg === 'Accepted' || checkResult?.status_code === 10 || gqlDetails?.statusCode === 10;
+
+    // If it was an intercepted submission and explicitly rejected (e.g. Wrong Answer, Compile Error):
+    if (isRealSubId && !isAccepted && (checkResult || gqlDetails)) {
+      const display = statusMsg || STATUS_MAP[checkResult?.status_code || gqlDetails?.statusCode] || 'Wrong Answer';
+      console.log('[CodeRelay LeetCode] Submission not accepted:', display);
       return {
         accepted: false,
-        statusDisplay: statusText
+        statusDisplay: display
       };
     }
 
-    const langKey = (details.lang?.name || '').toLowerCase();
-    const extension = LANGUAGE_EXTENSIONS[langKey] || 'txt';
-    const difficulty = (details.question?.difficulty || 'Unknown') as ProblemDifficulty;
-    const tags = (details.topicTags || []).map((t: any) => t.name);
+    // Short buffer for accepted auto-sync
+    if (isAccepted) {
+      await new Promise(r => setTimeout(r, 500));
+    }
+
+    // Retrieve question data (from GraphQL details or public question API)
+    let questionData = gqlDetails?.question || (slug ? await this.fetchProblemBySlug(slug) : null);
+    const title = questionData?.title || slug.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    const problemId = questionData?.questionFrontendId || questionData?.questionId || '';
+    const difficulty = (questionData?.difficulty || 'Medium') as ProblemDifficulty;
+    const tags = (questionData?.topicTags || []).map((t: any) => t.name);
+    const content = questionData?.content || '';
+
+    // Final source code
+    const finalCode = capturedCode?.trim() || checkResult?.code || gqlDetails?.code || '';
+    if (!finalCode) {
+      console.warn('[CodeRelay LeetCode] No code captured');
+      return {
+        accepted: false,
+        statusDisplay: 'No code found'
+      };
+    }
+
+    const langInfo = this.getSelectedLanguage();
+    const runtime = checkResult?.status_runtime || gqlDetails?.runtimeDisplay || 'N/A';
+    const memory = checkResult?.status_memory || gqlDetails?.memoryDisplay || 'N/A';
 
     const descriptionMarkdown = this.buildReadme(
-      details.question.title,
-      details.question.questionFrontendId || details.question.questionId,
-      details.question.titleSlug,
+      title,
+      problemId,
+      slug,
       difficulty,
-      details.runtimeDisplay || 'N/A',
-      details.memoryDisplay || 'N/A',
+      runtime,
+      memory,
       tags,
-      details.question.content || ''
+      content
     );
 
     const payload: SubmissionPayload = {
       platform: 'leetcode',
-      problemId: details.question.questionFrontendId || details.question.questionId,
-      problemSlug: details.question.titleSlug,
-      title: details.question.title,
+      problemId,
+      problemSlug: slug,
+      title,
       difficulty,
-      language: details.lang?.verboseName || details.lang?.name || 'Unknown',
-      extension,
-      code: details.code,
-      runtime: details.runtimeDisplay,
-      memory: details.memoryDisplay,
+      language: gqlDetails?.lang?.verboseName || gqlDetails?.lang?.name || langInfo.name,
+      extension: gqlDetails?.lang?.name ? (LANGUAGE_EXTENSIONS[gqlDetails.lang.name.toLowerCase()] || langInfo.ext) : langInfo.ext,
+      code: finalCode,
+      runtime,
+      memory,
       tags,
       descriptionMarkdown,
-      timestamp: details.timestamp ? details.timestamp * 1000 : Date.now()
+      timestamp: Date.now()
     };
 
     return {

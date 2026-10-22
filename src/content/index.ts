@@ -175,28 +175,32 @@ function initContentScript() {
     handleSubmission(targetAdapter, submissionId, code);
   };
 
-  // DOM observer fallback for GFG, CodeChef, and Codeforces success banners
-  if (activeAdapter.platform === 'gfg' || activeAdapter.platform === 'codechef' || activeAdapter.platform === 'codeforces') {
-    let alreadySynced = false;
-    const observer = new MutationObserver(() => {
-      const hasCfAccepted = !!document.querySelector('.verdict-accepted, [class*="verdict-accepted"]');
-      const text = document.body?.innerText || '';
-      const isSuccess = hasCfAccepted ||
-                        text.includes('Problem Solved Successfully') ||
-                        text.includes('Correct Answer') ||
-                        text.includes('100 pts');
+  // DOM observer fallback for LeetCode, GFG, CodeChef, and Codeforces success verdicts
+  let alreadySynced = false;
+  const observer = new MutationObserver(() => {
+    const text = document.body?.innerText || '';
+    const lcResultEl = document.querySelector('[data-e2e-locator="submission-result"]');
+    const hasLeetCodeAccepted = !!lcResultEl && (lcResultEl.textContent?.includes('Accepted') || false);
+    const hasCfAccepted = !!document.querySelector('.verdict-accepted, [class*="verdict-accepted"]');
 
-      if (isSuccess && !alreadySynced) {
-        alreadySynced = true;
-        console.log(`[CodeRelay ${activeAdapter.platform.toUpperCase()}] Detected submission success in DOM!`);
-        handleSubmission(activeAdapter, Date.now());
-        setTimeout(() => {
-          alreadySynced = false;
-        }, 12000);
-      }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-  }
+    const isSuccess = hasLeetCodeAccepted ||
+                      hasCfAccepted ||
+                      text.includes('Problem Solved Successfully') ||
+                      text.includes('Correct Answer') ||
+                      text.includes('100 pts');
+
+    if (isSuccess && !alreadySynced) {
+      alreadySynced = true;
+      console.log(`[CodeRelay ${activeAdapter.platform.toUpperCase()}] Detected submission success in DOM!`);
+      queryMainWorldCode().then(code => {
+        handleSubmission(activeAdapter, lastSubmissionId || Date.now(), code);
+      });
+      setTimeout(() => {
+        alreadySynced = false;
+      }, 12000);
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
 
   window.addEventListener('codeRelaySubmission', onSubmissionEvent);
 }
