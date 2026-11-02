@@ -173,8 +173,19 @@ export class GitHubService {
     const readmeFilePath = `${problemFolder}/README.md`;
 
     try {
+      // Duplicate prevention: skip if exact same code was already synced for this problem within the last 5 minutes
+      const lastSynced = await storage.getLastSyncedSubmission(payload.problemSlug);
+      if (lastSynced && lastSynced.code.trim() === payload.code.trim() && Date.now() - lastSynced.timestamp < 300000) {
+        console.log('[CodeRelay GitHub] Identical solution already synced within last 5 minutes. Skipping redundant commit.');
+        return {
+          success: true,
+          commitUrl: lastSynced.commitUrl
+        };
+      }
+
       const cachedCodeSha = await storage.getFileSha(payload.problemSlug, codeFileName);
-      const codeCommitMsg = `Sync solution: ${payload.title} [${payload.difficulty}] (${payload.runtime || ''}) - CodeRelay`;
+      const runtimeTag = payload.runtime && payload.runtime !== 'N/A' ? ` (${payload.runtime})` : '';
+      const codeCommitMsg = `Sync solution: ${payload.title} [${payload.difficulty}]${runtimeTag} - CodeRelay`;
 
       const codeResult = await this.commitFile(
         token,
@@ -201,6 +212,11 @@ export class GitHubService {
 
       await storage.setFileSha(payload.problemSlug, 'README.md', readmeResult.sha);
       await storage.incrementPlatformStat(payload.platform);
+      await storage.setLastSyncedSubmission(payload.problemSlug, {
+        code: payload.code,
+        timestamp: Date.now(),
+        commitUrl: codeResult.html_url
+      });
 
       return {
         success: true,

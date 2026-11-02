@@ -154,7 +154,7 @@ ${markdownContent}
     const baseUrl = isCN ? 'https://leetcode.cn' : 'https://leetcode.com';
     const checkUrl = `${baseUrl}/submissions/detail/${submissionId}/check/`;
 
-    for (let attempt = 1; attempt <= 15; attempt++) {
+    for (let attempt = 1; attempt <= 25; attempt++) {
       try {
         const response = await fetch(checkUrl, {
           method: 'GET',
@@ -296,7 +296,7 @@ ${markdownContent}
   async processSubmission(submissionId: string | number, capturedCode?: string | null): Promise<SubmissionResult | null> {
     const subNum = Number(submissionId);
     const slug = this.getProblemSlug();
-    const isRealSubId = !isNaN(subNum) && subNum > 0 && subNum < 2000000000;
+    const isRealSubId = !isNaN(subNum) && subNum > 0 && subNum < 100_000_000_000;
 
     let checkResult: any = null;
     let gqlDetails: any = null;
@@ -311,19 +311,42 @@ ${markdownContent}
       }
     }
 
-    // Determine verdict from check API, GraphQL, or page DOM
-    const statusMsg = checkResult?.status_msg || gqlDetails?.statusDisplay || (checkResult?.status_code === 10 || gqlDetails?.statusCode === 10 ? 'Accepted' : null);
-    const lcResultEl = document.querySelector('[data-e2e-locator="submission-result"]');
-    const hasDomAccepted = !!lcResultEl && (lcResultEl.textContent?.includes('Accepted') || false);
-    const isAccepted = statusMsg === 'Accepted' || checkResult?.status_code === 10 || gqlDetails?.statusCode === 10 || hasDomAccepted;
+    let isAccepted = false;
+    let verdictDisplay = 'Pending';
+
+    if (checkResult) {
+      isAccepted = checkResult.status_code === 10 || checkResult.status_msg === 'Accepted';
+      verdictDisplay = checkResult.status_msg || STATUS_MAP[checkResult.status_code] || (isAccepted ? 'Accepted' : 'Not Accepted');
+    } else if (gqlDetails) {
+      isAccepted = gqlDetails.statusCode === 10 || gqlDetails.statusDisplay === 'Accepted';
+      verdictDisplay = gqlDetails.statusDisplay || STATUS_MAP[gqlDetails.statusCode] || (isAccepted ? 'Accepted' : 'Not Accepted');
+    } else if (!isRealSubId) {
+      // Manual push fallback (user clicked Push button without a submission event)
+      const lcResultEl = document.querySelector('[data-e2e-locator="submission-result"]');
+      const text = (lcResultEl?.textContent || '').trim();
+      const hasDomAccepted = text.includes('Accepted');
+      const hasDomError = text.includes('Wrong Answer') || text.includes('Runtime Error') || text.includes('Time Limit') || text.includes('Compile Error');
+      if (hasDomAccepted && !hasDomError) {
+        isAccepted = true;
+        verdictDisplay = 'Accepted';
+      } else {
+        isAccepted = false;
+        verdictDisplay = hasDomError ? text : 'Submit first';
+      }
+    } else {
+      console.warn('[CodeRelay LeetCode] Could not verify verdict for submission ID:', subNum);
+      return {
+        accepted: false,
+        statusDisplay: 'Verdict unavailable'
+      };
+    }
 
     // Strict Rule: ONLY push if submission is explicitly ACCEPTED. Block everything else.
     if (!isAccepted) {
-      const display = statusMsg || (checkResult?.status_code ? STATUS_MAP[checkResult.status_code] : null) || (gqlDetails?.statusCode ? STATUS_MAP[gqlDetails.statusCode] : null) || 'Not Accepted';
-      console.log('[CodeRelay LeetCode] Submission is NOT accepted (Verdict: ' + display + '). Push blocked.');
+      console.log(`[CodeRelay LeetCode] Submission ${submissionId} is NOT accepted (Verdict: ${verdictDisplay}). Push blocked.`);
       return {
         accepted: false,
-        statusDisplay: display
+        statusDisplay: verdictDisplay
       };
     }
 
@@ -349,16 +372,16 @@ ${markdownContent}
     }
 
     const langInfo = this.getSelectedLanguage();
-    const runtime = checkResult?.status_runtime || gqlDetails?.runtimeDisplay || 'N/A';
-    const memory = checkResult?.status_memory || gqlDetails?.memoryDisplay || 'N/A';
+    const runtime = checkResult?.status_runtime || gqlDetails?.runtimeDisplay || '';
+    const memory = checkResult?.status_memory || gqlDetails?.memoryDisplay || '';
 
     const descriptionMarkdown = this.buildReadme(
       title,
       problemId,
       slug,
       difficulty,
-      runtime,
-      memory,
+      runtime || 'N/A',
+      memory || 'N/A',
       tags,
       content
     );

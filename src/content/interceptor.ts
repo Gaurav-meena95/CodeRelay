@@ -72,7 +72,16 @@
     return null;
   }
 
+  let lastDispatchedSubId: string | number | null = null;
+  let lastDispatchedTime = 0;
+
   function dispatchSubmission(submissionId: string | number, platform = 'leetcode') {
+    if (lastDispatchedSubId === submissionId && Date.now() - lastDispatchedTime < 3000) {
+      return;
+    }
+    lastDispatchedSubId = submissionId;
+    lastDispatchedTime = Date.now();
+
     const code = getEditorCode();
     console.log(`[CodeRelay Interceptor] Captured ${platform.toUpperCase()} Submission ID:`, submissionId, 'HasCode:', !!code);
     const detail = { platform, submissionId, code };
@@ -91,7 +100,7 @@
     const response = await originalFetch.apply(this, args);
 
     // 1. LeetCode Submissions
-    if (url.includes('/problems/') && url.includes('/submit/')) {
+    if (url.includes('/problems/') && (url.includes('/submit/') || url.endsWith('/submit'))) {
       try {
         const cloned = response.clone();
         const data = await cloned.json();
@@ -105,13 +114,13 @@
     }
 
     // 2. LeetCode GraphQL Mutations
-    if (url.includes('/graphql/') && options?.method === 'POST') {
+    if (url.includes('/graphql') && options?.method === 'POST') {
       try {
-        const body = JSON.parse(options?.body as string || '{}');
-        if (body.operationName === 'submitQuestion' || body.operationName === 'submit') {
+        const body = typeof options?.body === 'string' ? JSON.parse(options.body) : {};
+        if (body.operationName === 'submitQuestion' || body.operationName === 'submit' || body.operationName === 'submitCode') {
           const cloned = response.clone();
           const data = await cloned.json();
-          const subId = data?.data?.submitQuestion?.submissionId || data?.data?.submissionId;
+          const subId = data?.data?.submitQuestion?.submissionId || data?.data?.submitQuestion?.submission_id || data?.data?.submissionId;
           if (subId) {
             dispatchSubmission(subId, 'leetcode');
           }
@@ -161,10 +170,20 @@
     this.addEventListener('load', function () {
       const url: string = (this as any)._coderelay_url || '';
 
-      if (url.includes('/problems/') && url.includes('/submit/')) {
+      if (url.includes('/problems/') && (url.includes('/submit/') || url.endsWith('/submit'))) {
         try {
           const data = JSON.parse(this.responseText);
           const subId = data?.submission_id || data?.submissionId;
+          if (subId) {
+            dispatchSubmission(subId, 'leetcode');
+          }
+        } catch {}
+      }
+
+      if (url.includes('/graphql')) {
+        try {
+          const data = JSON.parse(this.responseText);
+          const subId = data?.data?.submitQuestion?.submissionId || data?.data?.submitQuestion?.submission_id || data?.data?.submissionId;
           if (subId) {
             dispatchSubmission(subId, 'leetcode');
           }

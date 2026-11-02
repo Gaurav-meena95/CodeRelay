@@ -124,6 +124,25 @@ export const storage = {
   },
 
   /**
+   * Retrieves last synced submission code and metadata for duplicate prevention
+   */
+  async getLastSyncedSubmission(problemSlug: string): Promise<{ code: string; timestamp: number; commitUrl?: string } | null> {
+    const data = await chrome.storage.local.get('coderelay_last_synced');
+    const store = (data.coderelay_last_synced || {}) as Record<string, { code: string; timestamp: number; commitUrl?: string }>;
+    return store[problemSlug] || null;
+  },
+
+  /**
+   * Saves last synced submission code to prevent redundant repeat commits
+   */
+  async setLastSyncedSubmission(problemSlug: string, record: { code: string; timestamp: number; commitUrl?: string }): Promise<void> {
+    const data = await chrome.storage.local.get('coderelay_last_synced');
+    const store = (data.coderelay_last_synced || {}) as Record<string, { code: string; timestamp: number; commitUrl?: string }>;
+    store[problemSlug] = record;
+    await chrome.storage.local.set({ coderelay_last_synced: store });
+  },
+
+  /**
    * Clears all session data (used for logout)
    */
   async clearAll(): Promise<void> {
